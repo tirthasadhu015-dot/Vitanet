@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Hospital Registration | Vitanet{% endblock %}
+
+{% block content %}
+<section class="form-card" aria-labelledby="hospital-heading">
+    <p class="eyebrow">Hospital portal</p>
+    <h1 id="hospital-heading">Register your hospital</h1>
+    <p class="intro">
+        Submit your credentials for a preliminary AI-assisted background
+        assessment before joining the Vitanet network.
+    </p>
+
+    <form action="{{ url_for('register_hospital') }}" method="post">
+        <div class="form-grid">
+            <div class="field field-full">
+                <label for="name">Hospital name</label>
+                <input id="name" name="name" type="text" required>
+            </div>
+
+            <div class="field">
+                <label for="license_no">License number</label>
+                <input id="license_no" name="license_no" type="text" required>
+            </div>
+
+            <div class="field">
+                <label for="email">Registration email</label>
+                <input id="email" name="email" type="email" required>
+            </div>
+
+            <div class="field field-full">
+                <label for="location">Location</label>
+                <input id="location" name="location" type="text" required>
+            </div>
+        </div>
+
+        <button class="button" type="submit">Submit for assessment</button>
+    </form>
+</section>
+{% endblock %}

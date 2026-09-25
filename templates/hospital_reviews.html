@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ hospital.name }} Reviews | Vitanet{% endblock %}
+
+{% block content %}
+<section class="reviews-layout">
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">Hospital directory</p>
+            <h1>{{ hospital.name }}</h1>
+            <p class="intro">Patient and donor experiences after completed matches.</p>
+        </div>
+        <div class="rating-summary" aria-label="Hospital rating">
+            <strong>{{ hospital.rating_average }}</strong>
+            <span class="star">★</span>
+            <small>{{ hospital.rating_count }} reviews</small>
+        </div>
+    </div>
+
+    <div class="reviews-grid">
+        <section class="table-card" aria-labelledby="reviews-heading">
+            <div class="section-heading">
+                <h2 id="reviews-heading">Community reviews</h2>
+            </div>
+            {% if reviews %}
+                <div class="review-list">
+                {% for review in reviews %}
+                    <article class="review-item">
+                        <div class="review-meta">
+                            <span class="stars" aria-label="{{ review.rating }} out of 5 stars">
+                                {{ "★" * review.rating }}{{ "☆" * (5 - review.rating) }}
+                            </span>
+                            <span>{{ review.created_at[:10] }}</span>
+                        </div>
+                        <p>{{ review.review_text }}</p>
+                    </article>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <strong>No reviews yet</strong>
+                    <p>Reviews will appear after completed matches.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="form-card review-form-card" aria-labelledby="review-form-heading">
+            <p class="eyebrow">Post-service feedback</p>
+            <h2 id="review-form-heading">Share a review</h2>
+            <p class="intro">Only participants in a completed match can submit feedback.</p>
+            <form method="post"
+                  action="{{ url_for('create_hospital_review', hospital_id=hospital.id) }}?redirect=reviews">
+                <div class="field">
+                    <label for="user_id">Your account ID</label>
+                    <input id="user_id" name="user_id" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="rating">Rating</label>
+                    <select id="rating" name="rating" required>
+                        <option value="5">5 — Excellent</option>
+                        <option value="4">4 — Good</option>
+                        <option value="3">3 — Average</option>
+                        <option value="2">2 — Needs improvement</option>
+                        <option value="1">1 — Poor</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="review_text">Review</label>
+                    <textarea id="review_text" name="review_text" rows="5" required></textarea>
+                </div>
+                <button class="button" type="submit">Submit review</button>
+            </form>
+        </section>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Registration | Vitanet{% endblock %}
+
+{% block content %}
+<section class="form-card" aria-labelledby="patient-heading">
+    <p class="eyebrow">Patient portal</p>
+    <h1 id="patient-heading">Register an organ requirement</h1>
+    <p class="intro">
+        Provide your requirement, urgency, and Solana wallet details so the
+        matching and escrow workflow can begin.
+    </p>
+
+    <form action="{{ url_for('register_patient') }}" method="post">
+        <div class="form-grid">
+            <div class="field field-full">
+                <label for="name">Full name</label>
+                <input id="name" name="name" type="text" required>
+            </div>
+
+            <div class="field">
+                <label for="blood_group">Blood group</label>
+                <select id="blood_group" name="blood_group" required>
+                    <option value="">Select blood group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="required_organ">Required organ</label>
+                <input id="required_organ" name="required_organ" type="text"
+                       placeholder="e.g. liver" required>
+            </div>
+
+            <div class="field">
+                <label for="urgency">Urgency</label>
+                <select id="urgency" name="urgency" required>
+                    <option value="">Select urgency</option>
+                    <option value="Emergency">Emergency</option>
+                    <option value="High">High</option>
+                    <option value="Normal">Normal</option>
+                </select>
+            </div>
+
+            <div class="field field-full">
+                <label for="location">Location</label>
+                <input id="location" name="location" type="text"
+                       placeholder="City or region">
+            </div>
+
+            <div class="field field-full">
+                <label for="solana_wallet">Solana wallet address</label>
+                <input id="solana_wallet" name="solana_wallet" type="text"
+                       autocomplete="off" required>
+            </div>
+
+            <div class="field field-full">
+                <label for="deposit_amount">Escrow deposit (SOL)</label>
+                <input id="deposit_amount" name="deposit_amount"
+                       type="number" min="0.000000001" step="0.000000001"
+                       required>
+                <small>
+                    After successful registration, the tracked state is
+                    <strong>Locked in Escrow</strong>.
+                </small>
+            </div>
+        </div>
+
+        <button class="button" type="submit">Submit patient registration</button>
+    </form>
+</section>
+{% endblock %}

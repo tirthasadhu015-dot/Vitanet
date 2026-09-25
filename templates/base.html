@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Vitanet{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <header class="site-header">
+            <div class="brand-lockup">
+                <a class="brand" href="{{ url_for('index') }}">Vitanet</a>
+                <span class="tagline">Decentralized trust for life-saving donations</span>
+            </div>
+            <nav class="main-nav" aria-label="Primary navigation">
+                <a href="{{ url_for('donor_registration_form') }}">Donate</a>
+                <a href="{{ url_for('patient_registration_form') }}">Find an organ</a>
+                <a href="{{ url_for('hospital_registration_form') }}">Hospitals</a>
+            </nav>
+        </header>
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

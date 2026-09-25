@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ hospital.name }} Dashboard | Vitanet{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <aside class="sidebar" aria-label="Hospital dashboard navigation">
+        <p class="sidebar-label">Hospital dashboard</p>
+        <h2>{{ hospital.name }}</h2>
+        <p class="sidebar-muted">{{ hospital.location }}</p>
+        <nav class="sidebar-nav">
+            <a class="active" href="#matches">Match queue</a>
+            <a href="{{ url_for('hospital_reviews', hospital_id=hospital.id) }}">
+                Reviews
+            </a>
+        </nav>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">Operations center</p>
+                <h1 id="matches">Verification queue</h1>
+                <p class="intro">Review completed procedures and release locked escrow.</p>
+            </div>
+            <span class="status-badge {% if hospital.is_verified %}status-completed{% else %}status-pending{% endif %}">
+                {% if hospital.is_verified %}Verified hospital{% else %}Pending verification{% endif %}
+            </span>
+        </div>
+
+        <div class="stat-grid">
+            <article class="stat-card">
+                <span class="stat-label">Active matches</span>
+                <strong>{{ matches|length }}</strong>
+            </article>
+            <article class="stat-card">
+                <span class="stat-label">Hospital rating</span>
+                <strong>{{ hospital.rating_average }} <span class="star">★</span></strong>
+                <small>{{ hospital.rating_count }} reviews</small>
+            </article>
+            <article class="stat-card stat-card-accent">
+                <span class="stat-label">Settlement rail</span>
+                <strong>Solana</strong>
+                <small>Escrow release via RPC proxy</small>
+            </article>
+        </div>
+
+        <section class="table-card" aria-labelledby="queue-heading">
+            <div class="section-heading">
+                <div>
+                    <h2 id="queue-heading">Pending matches</h2>
+                    <p>Confirm only after the operation has been completed.</p>
+                </div>
+            </div>
+
+            {% if matches %}
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Donor</th>
+                            <th>Organ</th>
+                            <th>Urgency</th>
+                            <th>Escrow</th>
+                            <th>Status</th>
+                            <th><span class="sr-only">Action</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in matches %}
+                        <tr>
+                            <td>{{ match.patient_name }}</td>
+                            <td>{{ match.donor_name }}</td>
+                            <td>{{ match.required_organ }}</td>
+                            <td><span class="urgency-pill">{{ match.urgency }}</span></td>
+                            <td>{{ match.deposit_amount }} SOL</td>
+                            <td>
+                                <span class="status-badge status-{{ match.status|lower|replace('_', '-') }}">
+                                    {{ match.status|replace('_', ' ') }}
+                                </span>
+                            </td>
+                            <td class="action-cell">
+                                {% if match.status == "Pending" %}
+                                <form method="post"
+                                      action="{{ url_for('verify_match', match_id=match.id) }}?redirect=dashboard">
+                                    <button class="button button-small" type="submit">
+                                        Verify &amp; release
+                                    </button>
+                                </form>
+                                {% elif match.solana_tx_hash %}
+                                <a class="tx-link" href="#tx-{{ match.id }}">View payout</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <strong>No matches in the queue</strong>
+                <p>New compatible matches will appear here for review.</p>
+            </div>
+            {% endif %}
+        </section>
+    </main>
+</div>
+{% endblock %}
