@@ -1,0 +1,23 @@
+# Local environment and deployment secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.secret
+secrets/
+
+# Python and local tooling artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local server and operating-system files
+*.log
+.DS_Store
+Thumbs.db
