@@ -10,6 +10,9 @@
         Share your health details and upload a current medical certificate for
         secure review by the Vitanet team.
     </p>
+    <p class="intro">
+        Already registered? <a class="tx-link" href="{{ url_for('donor_login') }}">Log in to your donor portal</a>.
+    </p>
 
     <form action="{{ url_for('register_donor') }}" method="post"
           enctype="multipart/form-data">
@@ -44,6 +47,19 @@
                 <label for="contact">Contact details</label>
                 <input id="contact" name="contact" type="text"
                        placeholder="Phone or email" required>
+            </div>
+
+            <div class="field">
+                <label for="password">Create password</label>
+                <input id="password" name="password" type="password"
+                       minlength="8" autocomplete="new-password" required>
+            </div>
+
+            <div class="field">
+                <label for="password_confirm">Confirm password</label>
+                <input id="password_confirm" name="password_confirm"
+                       type="password" minlength="8"
+                       autocomplete="new-password" required>
             </div>
 
             <div class="field">

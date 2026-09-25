@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Donor Dashboard | Vitanet{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <aside class="sidebar" aria-label="Donor dashboard navigation">
+        <p class="sidebar-label">Donor dashboard</p>
+        <h2>{{ donor.name }}</h2>
+        <p class="sidebar-muted">{{ donor.login_id }}</p>
+        <nav class="sidebar-nav">
+            <a class="active" href="#status">My status</a>
+            <a href="{{ url_for('donor_registration_form') }}">Donation details</a>
+        </nav>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">Donor portal</p>
+                <h1 id="status">Your donation status</h1>
+                <p class="intro">Manage your registration and follow any active matches.</p>
+            </div>
+            <span class="status-badge {% if donor.status == 'Active' %}status-completed{% else %}status-pending{% endif %}">
+                {{ donor.status }}
+            </span>
+        </div>
+
+        <div class="stat-grid">
+            <article class="stat-card">
+                <span class="stat-label">Organ registered</span>
+                <strong>{{ donor.organ }}</strong>
+            </article>
+            <article class="stat-card">
+                <span class="stat-label">Blood group</span>
+                <strong>{{ donor.blood_group }}</strong>
+            </article>
+            <article class="stat-card stat-card-accent">
+                <span class="stat-label">Registration</span>
+                <strong>{{ donor.status }}</strong>
+                {% if donor.status == 'Active' %}
+                <form method="post" action="{{ url_for('cancel_donor_registration') }}?redirect=dashboard">
+                    <button class="button button-small" type="submit">Cancel registration</button>
+                </form>
+                {% endif %}
+            </article>
+        </div>
+
+        <section class="table-card" aria-labelledby="matches-heading">
+            <div class="section-heading">
+                <div>
+                    <h2 id="matches-heading">Match activity</h2>
+                    <p>Your status updates as hospitals review operations.</p>
+                </div>
+            </div>
+            {% if matches %}
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Hospital</th>
+                            <th>Organ</th>
+                            <th>Status</th>
+                            <th>Payout</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in matches %}
+                        <tr>
+                            <td>{{ match.patient_name }}</td>
+                            <td>{{ match.hospital_name }}</td>
+                            <td>{{ match.organ }}</td>
+                            <td><span class="status-badge status-{{ match.status|lower|replace('_', '-') }}">{{ match.status|replace('_', ' ') }}</span></td>
+                            <td>{{ 'Recorded' if match.solana_tx_hash else 'Pending' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <strong>No match activity yet</strong>
+                <p>Your active registration remains available for compatible matching.</p>
+            </div>
+            {% endif %}
+        </section>
+    </main>
+</div>
+{% endblock %}

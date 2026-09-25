@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Donor Login | Vitanet{% endblock %}
+
+{% block content %}
+<section class="form-card" aria-labelledby="donor-login-heading">
+    <p class="eyebrow">Donor portal</p>
+    <h1 id="donor-login-heading">Donor login</h1>
+    {% if registered %}
+    <p class="intro">
+        Registration complete. Your donor login ID is
+        <strong>{{ login_id }}</strong>. Keep it private with your password.
+    </p>
+    {% else %}
+    <p class="intro">Check your live donation status or manage your registration.</p>
+    {% endif %}
+    {% if error %}
+    <p class="status-badge status-pending">{{ error }}</p>
+    {% endif %}
+
+    <form action="{{ url_for('donor_login') }}" method="post">
+        <div class="form-grid">
+            <div class="field field-full">
+                <label for="donor_login_id">Donor login ID</label>
+                <input id="donor_login_id" name="donor_login_id" type="text"
+                       autocomplete="username" required>
+            </div>
+            <div class="field field-full">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password"
+                       autocomplete="current-password" required>
+            </div>
+        </div>
+        <button class="button" type="submit">Log in securely</button>
+    </form>
+    <p class="intro">Not registered yet? <a class="tx-link" href="{{ url_for('donor_registration_form') }}">Become a donor</a>.</p>
+</section>
+{% endblock %}

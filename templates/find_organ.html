@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Find an Organ | Vitanet{% endblock %}
+
+{% block content %}
+<section class="form-card" aria-labelledby="find-organ-heading">
+    <p class="eyebrow">Verified hospital portal</p>
+    <h1 id="find-organ-heading">Find an organ</h1>
+    {% if hospital %}
+    <p class="intro">
+        Searching as <strong>{{ hospital.name }}</strong> · Hospital ID
+        <strong>{{ hospital.registration_id }}</strong>
+    </p>
+    {% else %}
+    <p class="intro">
+        This search is restricted to verified hospitals. Enter your unique
+        four-digit hospital registration ID to continue.
+    </p>
+    {% endif %}
+    {% if error %}
+    <p class="status-badge status-pending">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('find_organ') }}">
+        <div class="form-grid">
+            <div class="field field-full">
+                <label for="hospital_registration_id">Hospital registration ID</label>
+                <input id="hospital_registration_id" name="hospital_registration_id"
+                       type="text" inputmode="numeric" pattern="[0-9]{4}"
+                       minlength="4" maxlength="4" required>
+            </div>
+            <div class="field">
+                <label for="required_organ">Required organ</label>
+                <input id="required_organ" name="required_organ" type="text"
+                       placeholder="e.g. kidney" required>
+            </div>
+            <div class="field">
+                <label for="blood_group">Patient blood group</label>
+                <select id="blood_group" name="blood_group">
+                    <option value="">Any compatible group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                </select>
+            </div>
+            <div class="field field-full">
+                <label for="urgency">Patient urgency</label>
+                <select id="urgency" name="urgency" required>
+                    <option value="Emergency">Emergency</option>
+                    <option value="High">High</option>
+                    <option value="Normal" selected>Normal</option>
+                </select>
+            </div>
+        </div>
+        <button class="button" type="submit">Search active donors</button>
+    </form>
+</section>
+
+{% if search_performed %}
+<section class="table-card search-results" aria-labelledby="search-results-heading">
+    <div class="section-heading">
+        <div>
+            <h2 id="search-results-heading">Available donor matches</h2>
+            <p>{{ results|length }} active donor{{ '' if results|length == 1 else 's' }} found.</p>
+        </div>
+        <span class="status-badge status-completed">Audited search</span>
+    </div>
+    {% if results %}
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Organ</th>
+                    <th>Blood group</th>
+                    <th>Location</th>
+                    <th>Match priority</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in results %}
+                <tr>
+                    <td>{{ result.organ }}</td>
+                    <td>{{ result.blood_group }}</td>
+                    <td>{{ result.location }}</td>
+                    <td>{{ result.score }}</td>
+                    <td><span class="status-badge status-completed">{{ result.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <strong>No active compatible donors found</strong>
+        <p>Try another organ type or blood group.</p>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

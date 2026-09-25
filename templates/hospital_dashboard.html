@@ -8,8 +8,10 @@
         <p class="sidebar-label">Hospital dashboard</p>
         <h2>{{ hospital.name }}</h2>
         <p class="sidebar-muted">{{ hospital.location }}</p>
+        <p class="sidebar-muted">Hospital ID: {{ hospital.registration_id }}</p>
         <nav class="sidebar-nav">
             <a class="active" href="#matches">Match queue</a>
+            <a href="{{ url_for('find_organ') }}">Find an organ</a>
             <a href="{{ url_for('hospital_reviews', hospital_id=hospital.id) }}">
                 Reviews
             </a>

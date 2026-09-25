@@ -7,7 +7,6 @@
 *.p12
 *.secret
 secrets/
-.env.example
 
 # Python and local tooling artifacts
 __pycache__/

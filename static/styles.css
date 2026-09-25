@@ -602,6 +602,10 @@ small {
     padding: 22px;
 }
 
+.search-results {
+    margin-top: 24px;
+}
+
 .table-card h2 {
     font-size: 24px;
     font-weight: 600;

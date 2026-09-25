@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import secrets
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
@@ -13,9 +14,18 @@ from bson.decimal128 import Decimal128
 from bson.errors import InvalidId
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_pymongo import PyMongo
-from pymongo.errors import PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 
@@ -58,6 +68,8 @@ MATCH_HOSPITAL_VERIFIED = "Hospital_Verified"
 MATCH_COMPLETED = "Completed"
 DEPOSIT_LOCKED = "Locked in Escrow"
 DEPOSIT_RELEASED = "Released to Donor"
+DONOR_ACTIVE = "Active"
+DONOR_CANCELLED = "Cancelled"
 LAMPORTS_PER_SOL = Decimal("1000000000")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -229,6 +241,55 @@ def _validate_donor_payload(payload):
             donor["location"] = location
 
     return donor, None
+
+
+def _validate_donor_password(payload):
+    """Validate donor login credentials without retaining plain text."""
+    password = payload.get("password")
+    confirmation = payload.get("password_confirm")
+    if not isinstance(password, str) or len(password) < 8:
+        return None, "password must contain at least 8 characters"
+    if password != confirmation:
+        return None, "password confirmation does not match"
+    return password, None
+
+
+def _generate_unique_hospital_registration_id():
+    """Generate an unused four-digit hospital registration ID."""
+    for _ in range(100):
+        registration_id = str(secrets.randbelow(9000) + 1000)
+        if mongo.db.hospitals.find_one(
+            {"hospital_registration_id": registration_id},
+            {"_id": 1},
+        ) is None:
+            return registration_id
+    raise RuntimeError("Could not generate a unique hospital registration ID")
+
+
+def _generate_unique_donor_login_id():
+    """Generate an unused donor login identifier."""
+    for _ in range(100):
+        login_id = f"DNR-{secrets.token_hex(4).upper()}"
+        if mongo.db.users.find_one(
+            {"donor_login_id": login_id},
+            {"_id": 1},
+        ) is None:
+            return login_id
+    raise RuntimeError("Could not generate a unique donor login ID")
+
+
+def _verified_hospital_by_registration_id(registration_id):
+    """Return a verified hospital for a four-digit registration ID."""
+    if not isinstance(registration_id, str) or not re.fullmatch(
+        r"\d{4}", registration_id
+    ):
+        return None
+    return mongo.db.hospitals.find_one(
+        {
+            "hospital_registration_id": registration_id,
+            "is_verified": True,
+        }
+    )
 
 
 def _validate_patient_payload(payload):
@@ -615,28 +676,39 @@ def create_app(test_config=None):
     """
     app = Flask(__name__)
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY"),
-        MONGO_URI=os.getenv(
+        SECRET_KEY=os.environ.get("SECRET_KEY"),
+        MONGO_URI=os.environ.get(
             "MONGO_URI",
             "mongodb://localhost:27017/vitanet",
         ),
         MONGO_CONNECT_TIMEOUT_MS=int(
-            os.getenv("MONGO_CONNECT_TIMEOUT_MS", "5000")
+            os.environ.get("MONGO_CONNECT_TIMEOUT_MS", "5000")
         ),
-        GEMINI_API_KEY=os.getenv("GEMINI_API_KEY"),
-        GEMINI_MODEL=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
-        DO_SPACES_ENDPOINT_URL=os.getenv("DO_SPACES_ENDPOINT_URL"),
-        DO_SPACES_REGION=os.getenv("DO_SPACES_REGION", "nyc3"),
-        DO_SPACES_BUCKET=os.getenv("DO_SPACES_BUCKET"),
-        DO_SPACES_KEY=os.getenv("DO_SPACES_KEY"),
-        DO_SPACES_SECRET=os.getenv("DO_SPACES_SECRET"),
+        GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY"),
+        GEMINI_MODEL=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
+        DO_SPACES_ENDPOINT_URL=os.environ.get("DO_SPACES_ENDPOINT_URL"),
+        DO_SPACES_REGION=os.environ.get("DO_SPACES_REGION", "nyc3"),
+        DO_SPACES_BUCKET=os.environ.get("DO_SPACES_BUCKET"),
+        DO_SPACES_KEY=os.environ.get("DO_SPACES_KEY"),
+        DO_SPACES_SECRET=os.environ.get("DO_SPACES_SECRET"),
         MAX_CONTENT_LENGTH=(
-            int(os.getenv("MAX_UPLOAD_SIZE_MB", "10")) * 1024 * 1024
+            int(os.environ.get("MAX_UPLOAD_SIZE_MB", "10")) * 1024 * 1024
         ),
-        SOLANA_RPC_URL=os.getenv("SOLANA_RPC_URL"),
-        SOLANA_NETWORK=os.getenv("SOLANA_NETWORK", "devnet"),
-        SOLANA_COMMITMENT=os.getenv("SOLANA_COMMITMENT", "confirmed"),
-        SOLANA_ESCROW_PRIVATE_KEY=os.getenv("SOLANA_ESCROW_PRIVATE_KEY"),
+        SOLANA_RPC_URL=os.environ.get("SOLANA_RPC_URL"),
+        SOLANA_NETWORK=os.environ.get("SOLANA_NETWORK", "devnet"),
+        SOLANA_COMMITMENT=os.environ.get(
+            "SOLANA_COMMITMENT",
+            "confirmed",
+        ),
+        SOLANA_ESCROW_PRIVATE_KEY=os.environ.get(
+            "SOLANA_ESCROW_PRIVATE_KEY"
+        ),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=(
+            os.environ.get("SESSION_COOKIE_SECURE", "false").lower()
+            == "true"
+        ),
     )
 
     if test_config is not None:
@@ -697,16 +769,37 @@ def create_app(test_config=None):
             app.logger.exception("Gemini hospital assessment failed")
             return jsonify(error="Hospital background check failed"), 502
 
-        hospital_record = {
-            **hospital,
-            "is_verified": is_verified,
-            "ai_background_report": report,
-            "created_at": datetime.now(timezone.utc),
-        }
-
         try:
+            mongo.db.hospitals.create_index(
+                "hospital_registration_id",
+                unique=True,
+                sparse=True,
+            )
+            hospital_record = {
+                **hospital,
+                "hospital_registration_id": (
+                    _generate_unique_hospital_registration_id()
+                ),
+                "is_verified": is_verified,
+                "ai_background_report": report,
+                "created_at": datetime.now(timezone.utc),
+            }
             result = mongo.db.hospitals.insert_one(hospital_record)
-        except PyMongoError:
+        except DuplicateKeyError:
+            try:
+                hospital_record["hospital_registration_id"] = (
+                    _generate_unique_hospital_registration_id()
+                )
+                result = mongo.db.hospitals.insert_one(hospital_record)
+            except (PyMongoError, RuntimeError):
+                app.logger.exception(
+                    "Hospital registration ID collision could not be resolved"
+                )
+                return (
+                    jsonify(error="Hospital registration could not be saved"),
+                    503,
+                )
+        except (PyMongoError, RuntimeError):
             app.logger.exception("Hospital registration could not be saved")
             return (
                 jsonify(error="Hospital registration could not be saved"),
@@ -715,6 +808,9 @@ def create_app(test_config=None):
 
         return jsonify(
             hospital_id=str(result.inserted_id),
+            hospital_registration_id=hospital_record[
+                "hospital_registration_id"
+            ],
             is_verified=is_verified,
             message="Hospital registration submitted for review",
         ), 201
@@ -727,11 +823,25 @@ def create_app(test_config=None):
     @app.post("/api/donors/register")
     def register_donor():
         """Upload a donor certificate and save the donor profile."""
-        donor, validation_error = _validate_donor_payload(
-            request.form.to_dict()
-        )
+        payload = request.form.to_dict()
+        donor, validation_error = _validate_donor_payload(payload)
         if validation_error:
             return jsonify(error=validation_error), 400
+
+        password, password_error = _validate_donor_password(payload)
+        if password_error:
+            return jsonify(error=password_error), 400
+
+        try:
+            mongo.db.users.create_index(
+                "donor_login_id",
+                unique=True,
+                sparse=True,
+            )
+            donor_login_id = _generate_unique_donor_login_id()
+        except (PyMongoError, RuntimeError):
+            app.logger.exception("Donor login ID could not be generated")
+            return jsonify(error="Donor registration is unavailable"), 503
 
         try:
             certificate_key = _upload_health_certificate(
@@ -751,21 +861,215 @@ def create_app(test_config=None):
         donor_record = {
             **donor,
             "role": "donor",
+            "donor_login_id": donor_login_id,
+            "password_hash": generate_password_hash(password),
+            "donor_status": DONOR_ACTIVE,
+            "donation_status": "Registered",
             "health_certificate_path": certificate_key,
             "created_at": datetime.now(timezone.utc),
         }
 
         try:
             result = mongo.db.users.insert_one(donor_record)
+        except DuplicateKeyError:
+            try:
+                donor_record["donor_login_id"] = (
+                    _generate_unique_donor_login_id()
+                )
+                result = mongo.db.users.insert_one(donor_record)
+            except PyMongoError:
+                _delete_health_certificate(
+                    certificate_key,
+                    app.config,
+                    app.logger,
+                )
+                app.logger.exception(
+                    "Donor login ID collision could not be resolved"
+                )
+                return (
+                    jsonify(error="Donor registration could not be saved"),
+                    503,
+                )
         except PyMongoError:
             _delete_health_certificate(certificate_key, app.config, app.logger)
             app.logger.exception("Donor registration could not be saved")
-            return jsonify(error="Donor registration could not be saved"), 503
+            return (
+                jsonify(error="Donor registration could not be saved"),
+                503,
+            )
 
         return jsonify(
             donor_id=str(result.inserted_id),
+            donor_login_id=donor_record["donor_login_id"],
+            donor_status=DONOR_ACTIVE,
             message="Donor registration submitted successfully",
         ), 201
+
+    @app.route("/donors/login", methods=["GET", "POST"])
+    def donor_login():
+        """Authenticate a registered donor with a generated login ID."""
+        if request.method == "GET":
+            return render_template(
+                "donor_login.html",
+                registered=request.args.get("registered") == "1",
+                login_id=request.args.get("login_id", ""),
+            )
+
+        payload = _request_payload()
+        login_id = payload.get("donor_login_id", "").strip()
+        password = payload.get("password", "")
+        if not login_id or not isinstance(password, str):
+            error = "Donor login ID and password are required"
+            if request.is_json:
+                return jsonify(error=error), 400
+            return render_template("donor_login.html", error=error), 400
+
+        if not app.secret_key:
+            error = "Donor authentication is not configured"
+            if request.is_json:
+                return jsonify(error=error), 503
+            return render_template("donor_login.html", error=error), 503
+
+        donor = mongo.db.users.find_one(
+            {"role": "donor", "donor_login_id": login_id}
+        )
+        password_hash = donor.get("password_hash", "") if donor else ""
+        try:
+            credentials_valid = donor is not None and check_password_hash(
+                password_hash,
+                password,
+            )
+        except (TypeError, ValueError):
+            credentials_valid = False
+        if not credentials_valid:
+            error = "Invalid donor login credentials"
+            if request.is_json:
+                return jsonify(error=error), 401
+            return render_template("donor_login.html", error=error), 401
+
+        session.clear()
+        session["donor_id"] = str(donor["_id"])
+        if request.is_json:
+            return jsonify(
+                donor_id=str(donor["_id"]),
+                donor_status=donor.get("donor_status", DONOR_ACTIVE),
+                message="Donor login successful",
+            ), 200
+        return redirect(url_for("donor_dashboard"))
+
+    @app.get("/donors/dashboard")
+    def donor_dashboard():
+        """Show the authenticated donor's live registration status."""
+        if not app.secret_key:
+            return redirect(url_for("donor_login"))
+        donor_object_id = _parse_object_id(session.get("donor_id"))
+        if donor_object_id is None:
+            return redirect(url_for("donor_login"))
+
+        donor = mongo.db.users.find_one(
+            {"_id": donor_object_id, "role": "donor"}
+        )
+        if donor is None:
+            session.clear()
+            return redirect(url_for("donor_login"))
+
+        match_views = []
+        matches = mongo.db.donations_matching.find(
+            {"donor_id": donor_object_id}
+        ).sort("created_at", -1)
+        for match in matches:
+            patient = mongo.db.users.find_one({"_id": match["patient_id"]})
+            hospital = mongo.db.hospitals.find_one(
+                {"_id": match["hospital_id"]}
+            )
+            match_views.append(
+                {
+                    "status": match.get("status", MATCH_PENDING),
+                    "patient_name": patient.get("name", "Unknown")
+                    if patient
+                    else "Unknown",
+                    "hospital_name": hospital.get("name", "Unknown")
+                    if hospital
+                    else "Unknown",
+                    "organ": donor.get("organ", ""),
+                    "solana_tx_hash": match.get("solana_tx_hash"),
+                }
+            )
+
+        donor_view = {
+            "name": donor.get("name", "Donor"),
+            "login_id": donor.get("donor_login_id", ""),
+            "status": donor.get("donor_status", DONOR_ACTIVE),
+            "organ": donor.get("organ", ""),
+            "blood_group": donor.get("blood_group", ""),
+        }
+        return render_template(
+            "donor_dashboard.html",
+            donor=donor_view,
+            matches=match_views,
+        )
+
+    @app.post("/api/donors/cancel")
+    def cancel_donor_registration():
+        """Cancel an authenticated donor registration and active matches."""
+        if not app.secret_key:
+            return jsonify(error="Donor authentication is not configured"), 503
+        donor_object_id = _parse_object_id(session.get("donor_id"))
+        if donor_object_id is None:
+            return jsonify(error="Donor login required"), 401
+
+        donor = mongo.db.users.find_one(
+            {"_id": donor_object_id, "role": "donor"}
+        )
+        if donor is None:
+            session.clear()
+            return jsonify(error="Donor not found"), 404
+
+        completed_match = mongo.db.donations_matching.find_one(
+            {
+                "donor_id": donor_object_id,
+                "status": {"$in": [MATCH_HOSPITAL_VERIFIED, MATCH_COMPLETED]},
+            }
+        )
+        if completed_match is not None:
+            return jsonify(
+                error="This donation cannot be cancelled after verification"
+            ), 409
+
+        now = datetime.now(timezone.utc)
+        try:
+            mongo.db.users.update_one(
+                {"_id": donor_object_id, "role": "donor"},
+                {
+                    "$set": {
+                        "donor_status": DONOR_CANCELLED,
+                        "donation_status": DONOR_CANCELLED,
+                        "cancelled_at": now,
+                    }
+                },
+            )
+            mongo.db.donations_matching.update_many(
+                {
+                    "donor_id": donor_object_id,
+                    "status": MATCH_PENDING,
+                },
+                {
+                    "$set": {
+                        "status": DONOR_CANCELLED,
+                        "cancelled_at": now,
+                    }
+                },
+            )
+        except PyMongoError:
+            app.logger.exception("Donor cancellation could not be saved")
+            return jsonify(error="Donor cancellation could not be saved"), 503
+
+        if request.args.get("redirect") == "dashboard":
+            return redirect(url_for("donor_dashboard"))
+        return jsonify(
+            donor_status=DONOR_CANCELLED,
+            message="Donation registration cancelled",
+        ), 200
 
     @app.get("/patients/register")
     def patient_registration_form():
@@ -808,14 +1112,156 @@ def create_app(test_config=None):
             message="Patient registration submitted successfully",
         ), 201
 
+    @app.route("/find-organ", methods=["GET", "POST"])
+    def find_organ():
+        """Allow verified hospitals to search the active donor pool."""
+        if request.method == "GET":
+            return render_template(
+                "find_organ.html",
+                hospital=None,
+                results=[],
+                search_performed=False,
+            )
+
+        payload = _request_payload()
+        hospital_registration_id = str(
+            payload.get("hospital_registration_id", "")
+        ).strip()
+        hospital = _verified_hospital_by_registration_id(
+            hospital_registration_id
+        )
+        if hospital is None:
+            return render_template(
+                "find_organ.html",
+                hospital=None,
+                results=[],
+                search_performed=False,
+                error=(
+                    "Only verified hospitals can search. Enter a valid "
+                    "4-digit hospital ID."
+                ),
+            ), 403
+
+        required_organ = str(payload.get("required_organ", "")).strip()
+        blood_group = str(payload.get("blood_group", "")).strip()
+        urgency = str(payload.get("urgency", "Normal")).strip()
+        if not required_organ:
+            return render_template(
+                "find_organ.html",
+                hospital=hospital,
+                results=[],
+                search_performed=False,
+                error="required_organ is required",
+            ), 400
+        if blood_group and blood_group not in ALLOWED_BLOOD_GROUPS:
+            return render_template(
+                "find_organ.html",
+                hospital=hospital,
+                results=[],
+                search_performed=False,
+                error="Select a valid blood group",
+            ), 400
+        if urgency not in ALLOWED_URGENCY_LEVELS:
+            return render_template(
+                "find_organ.html",
+                hospital=hospital,
+                results=[],
+                search_performed=False,
+                error="Select a valid urgency level",
+            ), 400
+
+        donors = mongo.db.users.find(
+            {
+                "role": "donor",
+                "donor_status": {"$ne": DONOR_CANCELLED},
+                "organ": {
+                    "$regex": f"^{re.escape(required_organ)}$",
+                    "$options": "i",
+                },
+            }
+        )
+        results = []
+        for donor in donors:
+            if blood_group and not _blood_groups_compatible(
+                donor.get("blood_group"),
+                blood_group,
+            ):
+                continue
+
+            score = URGENCY_SCORES[urgency]
+            if _normalized_location(donor.get("location")) == (
+                _normalized_location(hospital.get("location"))
+            ):
+                score += 15
+            results.append(
+                {
+                    "donor_id": str(donor["_id"]),
+                    "organ": donor.get("organ", ""),
+                    "blood_group": donor.get("blood_group", ""),
+                    "location": donor.get("location", "Not provided"),
+                    "status": donor.get("donor_status", DONOR_ACTIVE),
+                    "score": score,
+                }
+            )
+
+        results.sort(key=lambda item: item["score"], reverse=True)
+        try:
+            mongo.db.hospital_searches.insert_one(
+                {
+                    "hospital_id": hospital["_id"],
+                    "hospital_registration_id": hospital_registration_id,
+                    "criteria": {
+                        "required_organ": required_organ,
+                        "blood_group": blood_group,
+                        "urgency": urgency,
+                    },
+                    "result_count": len(results),
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+        except PyMongoError:
+            app.logger.exception(
+                "Hospital organ search audit could not be saved"
+            )
+            return render_template(
+                "find_organ.html",
+                hospital=hospital,
+                results=[],
+                search_performed=False,
+                error="Search is temporarily unavailable",
+            ), 503
+
+        hospital_view = {
+            "name": hospital.get("name", "Verified hospital"),
+            "registration_id": hospital_registration_id,
+        }
+        return render_template(
+            "find_organ.html",
+            hospital=hospital_view,
+            results=results,
+            search_performed=True,
+        )
+
     @app.post("/api/matches")
     def create_match():
         """Find and persist the highest-scoring donor match for a patient."""
         payload = _request_payload()
         patient_id = _parse_object_id(payload.get("patient_id"))
         hospital_id = _parse_object_id(payload.get("hospital_id"))
+        hospital_registration_id = str(
+            payload.get("hospital_registration_id", "")
+        ).strip()
         if patient_id is None:
             return jsonify(error="patient_id must be a valid identifier"), 400
+        hospital = _verified_hospital_by_registration_id(
+            hospital_registration_id
+        )
+        if hospital is None:
+            return jsonify(
+                error="A verified hospital registration ID is required"
+            ), 403
+        if hospital_id is not None and hospital["_id"] != hospital_id:
+            return jsonify(error="Hospital authorization does not match"), 403
 
         patient = mongo.db.users.find_one(
             {"_id": patient_id, "role": "patient"}
@@ -824,26 +1270,6 @@ def create_app(test_config=None):
             return jsonify(error="Patient not found"), 404
         if patient.get("deposit_status") != DEPOSIT_LOCKED:
             return jsonify(error="Patient escrow is not locked"), 409
-
-        if hospital_id is not None:
-            hospital = mongo.db.hospitals.find_one({"_id": hospital_id})
-        else:
-            hospitals = list(
-                mongo.db.hospitals.find({"is_verified": True})
-            )
-            hospital = max(
-                hospitals,
-                key=lambda item: (
-                    _normalized_location(item.get("location"))
-                    == _normalized_location(patient.get("location"))
-                ),
-                default=None,
-            )
-
-        if hospital is None:
-            return jsonify(error="No verified hospital is available"), 409
-        if not hospital.get("is_verified"):
-            return jsonify(error="Hospital is not verified"), 409
 
         existing_match = mongo.db.donations_matching.find_one(
             {
@@ -859,7 +1285,14 @@ def create_app(test_config=None):
                 match_id=str(existing_match["_id"]),
             ), 409
 
-        donors = list(mongo.db.users.find({"role": "donor"}))
+        donors = list(
+            mongo.db.users.find(
+                {
+                    "role": "donor",
+                    "donor_status": {"$ne": DONOR_CANCELLED},
+                }
+            )
+        )
         candidate = find_best_organ_match(patient, donors, hospital)
         if candidate is None:
             return jsonify(error="No compatible donor was found"), 404
@@ -868,6 +1301,7 @@ def create_app(test_config=None):
             "donor_id": candidate["donor"]["_id"],
             "patient_id": patient_id,
             "hospital_id": hospital["_id"],
+            "hospital_registration_id": hospital_registration_id,
             "status": MATCH_PENDING,
             "match_score": candidate["score"],
             "matching_factors": candidate["factors"],
@@ -934,6 +1368,7 @@ def create_app(test_config=None):
             "id": str(hospital["_id"]),
             "name": hospital.get("name", "Hospital"),
             "location": hospital.get("location", ""),
+            "registration_id": hospital.get("hospital_registration_id", ""),
             "is_verified": hospital.get("is_verified", False),
             "rating_average": hospital.get("rating_average", 0),
             "rating_count": hospital.get("rating_count", 0),
@@ -1205,6 +1640,22 @@ def create_app(test_config=None):
             message="Hospital review submitted successfully",
         ), 201
 
+    @app.after_request
+    def add_security_headers(response):
+        """Add baseline browser security headers to every response."""
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Referrer-Policy",
+            "strict-origin-when-cross-origin",
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; style-src 'self'; form-action 'self'; "
+            "frame-ancestors 'none'; base-uri 'self'",
+        )
+        return response
+
     @app.errorhandler(404)
     def handle_not_found(error):
         """Return a JSON response when a route does not exist."""
@@ -1231,7 +1682,7 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(
-        host=os.getenv("FLASK_HOST", "127.0.0.1"),
-        port=int(os.getenv("FLASK_PORT", "5000")),
-        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+        host=os.environ.get("FLASK_HOST", "127.0.0.1"),
+        port=int(os.environ.get("FLASK_PORT", "5000")),
+        debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true",
     )
