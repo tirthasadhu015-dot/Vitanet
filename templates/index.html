@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Vitanet | Organ Donation with Trust{% endblock %}
+
+{% block content %}
+<section class="hero-panel" aria-labelledby="hero-heading">
+    <div class="hero-copy">
+        <p class="eyebrow">A trusted path to a life-saving match</p>
+        <h1 id="hero-heading">Organ donation,<br><span>connected with care.</span></h1>
+        <p class="hero-intro">
+            Vitanet brings donors, patients, and verified hospitals together
+            with transparent matching, protected documents, and accountable
+            escrow settlement.
+        </p>
+        <div class="hero-actions">
+            <a class="button" href="{{ url_for('patient_registration_form') }}">
+                Find an organ
+            </a>
+            <a class="button button-secondary" href="{{ url_for('donor_registration_form') }}">
+                Become a donor
+            </a>
+        </div>
+        <div class="hero-trust">
+            <span class="trust-dot"></span>
+            <span>Secure, human-reviewed healthcare workflows</span>
+        </div>
+    </div>
+
+    <div class="hero-visual" aria-label="Vitanet workflow summary">
+        <div class="visual-orbit orbit-one"></div>
+        <div class="visual-orbit orbit-two"></div>
+        <div class="hero-node hero-node-main">V</div>
+        <div class="hero-node hero-node-top">AI</div>
+        <div class="hero-node hero-node-bottom">SOL</div>
+        <div class="hero-node hero-node-side">+</div>
+        <span class="orbit-label label-top">Verified</span>
+        <span class="orbit-label label-bottom">Escrow</span>
+    </div>
+</section>
+
+<section class="trust-strip" aria-label="Vitanet platform capabilities">
+    <div class="trust-item">
+        <span class="trust-icon">✦</span>
+        <div>
+            <strong>AI-assisted vetting</strong>
+            <span>Preliminary hospital risk assessment</span>
+        </div>
+    </div>
+    <div class="trust-item">
+        <span class="trust-icon">⌁</span>
+        <div>
+            <strong>Transparent matching</strong>
+            <span>Clear compatibility and urgency signals</span>
+        </div>
+    </div>
+    <div class="trust-item">
+        <span class="trust-icon">◈</span>
+        <div>
+            <strong>Protected settlement</strong>
+            <span>Escrow payout through Solana infrastructure</span>
+        </div>
+    </div>
+</section>
+
+<section class="home-section" aria-labelledby="path-heading">
+    <div class="section-heading home-section-heading">
+        <div>
+            <p class="eyebrow">One connected journey</p>
+            <h2 id="path-heading">Clarity at every step</h2>
+        </div>
+        <p>Designed for patients, donors, and the hospital teams who care for them.</p>
+    </div>
+
+    <div class="feature-grid">
+        <article class="feature-card">
+            <span class="feature-number">01</span>
+            <h3>Register with confidence</h3>
+            <p>Submit your requirements or donor profile through a clear, accessible portal.</p>
+            <a href="{{ url_for('patient_registration_form') }}">Start a registration <span>→</span></a>
+        </article>
+        <article class="feature-card feature-card-dark">
+            <span class="feature-number">02</span>
+            <h3>Match with purpose</h3>
+            <p>Compatibility, urgency, and proximity guide a transparent matching workflow.</p>
+            <a href="{{ url_for('hospital_registration_form') }}">Register a hospital <span>→</span></a>
+        </article>
+        <article class="feature-card">
+            <span class="feature-number">03</span>
+            <h3>Settle responsibly</h3>
+            <p>Hospital confirmation completes the workflow and releases the locked escrow.</p>
+            <a href="{{ url_for('donor_registration_form') }}">Explore donor portal <span>→</span></a>
+        </article>
+    </div>
+</section>
+{% endblock %}

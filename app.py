@@ -13,7 +13,6 @@ from bson.decimal128 import Decimal128
 from bson.errors import InvalidId
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
-import google.generativeai as genai
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_pymongo import PyMongo
 from pymongo.errors import PyMongoError
@@ -155,6 +154,13 @@ def run_hospital_background_check(hospital, api_key, model_name):
     """
     if not api_key:
         raise GeminiConfigurationError("GEMINI_API_KEY is not configured")
+
+    try:
+        import google.generativeai as genai
+    except ImportError as error:
+        raise GeminiConfigurationError(
+            "Gemini SDK dependencies are not installed"
+        ) from error
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name)
@@ -640,11 +646,8 @@ def create_app(test_config=None):
 
     @app.get("/")
     def index():
-        """Return a basic service description."""
-        return jsonify(
-            service="Vitanet API",
-            status="running",
-        )
+        """Render the Vitanet landing page."""
+        return render_template("index.html")
 
     @app.get("/health")
     def health_check():
@@ -665,7 +668,7 @@ def create_app(test_config=None):
     @app.get("/hospitals/register")
     def hospital_registration_form():
         """Render the hospital registration form."""
-        return render_template("hospital_registration.html")
+        return render_template("register_hospital.html")
 
     @app.post("/api/hospitals/register")
     def register_hospital():
@@ -719,7 +722,7 @@ def create_app(test_config=None):
     @app.get("/donors/register")
     def donor_registration_form():
         """Render the donor registration form."""
-        return render_template("donor_registration.html")
+        return render_template("register_donor.html")
 
     @app.post("/api/donors/register")
     def register_donor():
@@ -767,7 +770,7 @@ def create_app(test_config=None):
     @app.get("/patients/register")
     def patient_registration_form():
         """Render the patient registration form."""
-        return render_template("patient_registration.html")
+        return render_template("register_patient.html")
 
     @app.post("/api/patients/register")
     def register_patient():
