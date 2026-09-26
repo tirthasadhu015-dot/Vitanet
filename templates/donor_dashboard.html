@@ -10,7 +10,9 @@
         <p class="sidebar-muted">{{ donor.login_id }}</p>
         <nav class="sidebar-nav">
             <a class="active" href="#status">My status</a>
-            <a href="{{ url_for('donor_registration_form') }}">Donation details</a>
+            <a href="#details">Donation details</a>
+            <a href="{{ url_for('donor_profile') }}">Edit my information</a>
+            <a href="#security">Change password</a>
         </nav>
     </aside>
 
@@ -21,12 +23,43 @@
                 <h1 id="status">Your donation status</h1>
                 <p class="intro">Manage your registration and follow any active matches.</p>
             </div>
-            <span class="status-badge {% if donor.status == 'Active' %}status-completed{% else %}status-pending{% endif %}">
-                {{ donor.status }}
-            </span>
+            <div class="dashboard-actions">
+                <form class="wallet-connect-form"
+                      action="{{ url_for('donor_wallet_connection') }}"
+                      method="post">
+                    <label class="sr-only" for="dashboard_wallet">
+                        Solana wallet address
+                    </label>
+                    <input id="dashboard_wallet" name="solana_wallet"
+                           type="text" value="{{ donor.solana_wallet }}"
+                           placeholder="Solana wallet address"
+                           autocomplete="off" required>
+                    <button class="button button-small" type="submit">
+                        {% if donor.solana_wallet %}Update wallet{% else %}Connect Solana Wallet{% endif %}
+                    </button>
+                </form>
+                <span class="status-badge {% if donor.status == 'Active' %}status-completed{% else %}status-pending{% endif %}">
+                    {{ donor.status }}
+                </span>
+            </div>
         </div>
 
-        <div class="stat-grid">
+        {% if wallet_connected %}
+        <div class="toast toast-success" role="status">
+            Solana wallet connected successfully.
+        </div>
+        {% elif wallet_error %}
+        <div class="toast toast-error" role="alert">{{ wallet_error }}</div>
+        {% endif %}
+        {% if password_changed %}
+        <div class="toast toast-success" role="status">
+            Password changed successfully.
+        </div>
+        {% elif password_error %}
+        <div class="toast toast-error" role="alert">{{ password_error }}</div>
+        {% endif %}
+
+        <div class="stat-grid" id="details">
             <article class="stat-card">
                 <span class="stat-label">Organ registered</span>
                 <strong>{{ donor.organ }}</strong>
@@ -45,6 +78,42 @@
                 {% endif %}
             </article>
         </div>
+
+        <section class="form-card dashboard-form-card" id="security"
+                 aria-labelledby="security-heading">
+            <p class="eyebrow">Account security</p>
+            <h2 id="security-heading">Change password</h2>
+            <p class="intro">
+                Confirm your current password before choosing a new one.
+            </p>
+            <form action="{{ url_for('donor_password_change') }}"
+                  method="post">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="current_password">Current password</label>
+                        <input id="current_password" name="current_password"
+                               type="password" autocomplete="current-password"
+                               required>
+                    </div>
+                    <div class="field">
+                        <label for="new_password">New password</label>
+                        <input id="new_password" name="new_password"
+                               type="password" minlength="8"
+                               autocomplete="new-password" required>
+                    </div>
+                    <div class="field">
+                        <label for="new_password_confirm">
+                            Confirm new password
+                        </label>
+                        <input id="new_password_confirm"
+                               name="new_password_confirm" type="password"
+                               minlength="8" autocomplete="new-password"
+                               required>
+                    </div>
+                </div>
+                <button class="button" type="submit">Change password</button>
+            </form>
+        </section>
 
         <section class="table-card" aria-labelledby="matches-heading">
             <div class="section-heading">

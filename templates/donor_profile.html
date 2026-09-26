@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Donor Information | Vitanet{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <aside class="sidebar" aria-label="Donor dashboard navigation">
+        <p class="sidebar-label">Donor dashboard</p>
+        <h2>{{ donor.name }}</h2>
+        <p class="sidebar-muted">{{ donor.login_id }}</p>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('donor_dashboard') }}">My status</a>
+            <a class="active" href="#profile">Edit my information</a>
+            <a href="{{ url_for('donor_dashboard') }}#security">
+                Change password
+            </a>
+        </nav>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">Donor portal</p>
+                <h1 id="profile">Edit my information</h1>
+                <p class="intro">
+                    Keep your contact, health, and payout details current for
+                    safe donor matching.
+                </p>
+            </div>
+            <span class="status-badge {% if donor.status == 'Active' %}status-completed{% else %}status-pending{% endif %}">
+                {{ donor.status }}
+            </span>
+        </div>
+
+        {% if profile_updated %}
+        <div class="toast toast-success" role="status">
+            Donor information updated successfully.
+        </div>
+        {% elif profile_error %}
+        <div class="toast toast-error" role="alert">{{ profile_error }}</div>
+        {% endif %}
+        {% if password_changed %}
+        <div class="toast toast-success" role="status">
+            Password changed successfully.
+        </div>
+        {% elif password_error %}
+        <div class="toast toast-error" role="alert">{{ password_error }}</div>
+        {% endif %}
+
+        <section class="form-card" aria-labelledby="profile-heading">
+            <p class="eyebrow">Personal and clinical details</p>
+            <h2 id="profile-heading">Your donor profile</h2>
+            <form action="{{ url_for('donor_profile_update') }}" method="post"
+                  enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div class="field field-full">
+                        <label for="name">Full name</label>
+                        <input id="name" name="name" type="text"
+                               value="{{ donor.name }}" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="blood_group">Blood group</label>
+                        <select id="blood_group" name="blood_group" required>
+                            <option value="">Select blood group</option>
+                            {% for blood_group in blood_groups %}
+                            <option value="{{ blood_group }}"
+                                    {% if donor.blood_group == blood_group %}selected{% endif %}>
+                                {{ blood_group }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="organ">Organ type</label>
+                        <input id="organ" name="organ" type="text"
+                               value="{{ donor.organ }}" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="contact">Contact details</label>
+                        <input id="contact" name="contact" type="text"
+                               value="{{ donor.contact }}" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="location">Location</label>
+                        <input id="location" name="location" type="text"
+                               value="{{ donor.location }}">
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="solana_wallet">Solana payout wallet</label>
+                        <input id="solana_wallet" name="solana_wallet"
+                               type="text" value="{{ donor.solana_wallet }}"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="field">
+                        <label for="sugar_level">Sugar level</label>
+                        <input id="sugar_level" name="sugar_level" type="text"
+                               value="{{ donor.sugar_level }}"
+                               placeholder="e.g. 95 mg/dL">
+                    </div>
+
+                    <div class="field">
+                        <label for="blood_pressure">Blood pressure</label>
+                        <input id="blood_pressure" name="blood_pressure"
+                               type="text" value="{{ donor.blood_pressure }}"
+                               placeholder="e.g. 120/80">
+                    </div>
+
+                    <div class="field">
+                        <label for="weight">Weight</label>
+                        <input id="weight" name="weight" type="text"
+                               value="{{ donor.weight }}"
+                               placeholder="e.g. 70 kg">
+                    </div>
+
+                    <div class="field">
+                        <label for="height">Height</label>
+                        <input id="height" name="height" type="text"
+                               value="{{ donor.height }}"
+                               placeholder="e.g. 175 cm">
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="medical_history">Medical history</label>
+                        <textarea id="medical_history" name="medical_history"
+                                  rows="5">{{ donor.medical_history }}</textarea>
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="additional_health_details">
+                            Additional health details
+                        </label>
+                        <textarea id="additional_health_details"
+                                  name="additional_health_details" rows="5"
+                                  placeholder="Allergies, medications, or other clinical information">{{ donor.additional_health_details }}</textarea>
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="health_certificate">
+                            Medical certificate (optional)
+                        </label>
+                        <input id="health_certificate" name="health_certificate"
+                               type="file" accept=".pdf,.png,.jpg,.jpeg">
+                        {% if donor.health_certificate_path %}
+                        <small>A medical certificate is already on file. Upload
+                            a new one only if it needs to be replaced.</small>
+                        {% else %}
+                        <small>Accepted formats: PDF, PNG, JPG, or JPEG.</small>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <button class="button" type="submit">Save my information</button>
+            </form>
+        </section>
+
+        <p class="intro">
+            Need to update your password? Use
+            <a class="tx-link" href="{{ url_for('donor_dashboard') }}#security">
+                Change password in your dashboard
+            </a>.
+        </p>
+    </main>
+</div>
+{% endblock %}

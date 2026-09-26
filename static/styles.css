@@ -612,6 +612,35 @@ small {
     margin-bottom: 0;
 }
 
+.dashboard-actions {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.wallet-connect-form {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+.wallet-connect-form input {
+    max-width: 260px;
+    padding: 9px 10px;
+}
+
+.dashboard-form-card {
+    margin-bottom: 24px;
+}
+
+.dashboard-form-card h2,
+.form-card h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+}
+
 .stat-grid {
     display: grid;
     gap: 14px;
@@ -948,5 +977,19 @@ tbody tr:nth-child(even) {
 
     .page-heading {
         flex-direction: column;
+    }
+
+    .dashboard-actions {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .wallet-connect-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .wallet-connect-form input {
+        max-width: none;
     }
 }

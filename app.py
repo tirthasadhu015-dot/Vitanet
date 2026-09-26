@@ -146,6 +146,11 @@ class User(db.Model):
     contact = db.Column(db.String(255), nullable=True)
     location = db.Column(db.String(255), nullable=True)
     medical_history = db.Column(db.Text, nullable=True)
+    sugar_level = db.Column(db.String(50), nullable=True)
+    blood_pressure = db.Column(db.String(50), nullable=True)
+    weight = db.Column(db.String(50), nullable=True)
+    height = db.Column(db.String(50), nullable=True)
+    additional_health_details = db.Column(db.Text, nullable=True)
     donor_login_id = db.Column(db.String(32), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=True)
     health_certificate_path = db.Column(db.String(500), nullable=True)
@@ -504,6 +509,71 @@ def _validate_donor_password(payload):
     return password, None
 
 
+def _validate_donor_profile_payload(payload):
+    """Validate donor profile fields and clinical details."""
+    if not isinstance(payload, dict):
+        return None, "Profile data is required"
+
+    updates = {}
+    required_fields = ("name", "blood_group", "organ", "contact")
+    for field in required_fields:
+        if field not in payload:
+            continue
+        value = payload.get(field)
+        if not isinstance(value, str) or not value.strip():
+            return None, f"{field} is required"
+        updates[field] = value.strip()
+    if (
+        "blood_group" in updates
+        and updates["blood_group"] not in ALLOWED_BLOOD_GROUPS
+    ):
+        return None, "blood_group must be a valid blood group"
+
+    optional_fields = (
+        "location",
+        "medical_history",
+        "solana_wallet",
+        "sugar_level",
+        "blood_pressure",
+        "weight",
+        "height",
+        "additional_health_details",
+    )
+    for field in optional_fields:
+        if field not in payload:
+            continue
+        value = payload.get(field)
+        if not isinstance(value, str):
+            return None, f"{field} must be text"
+        updates[field] = value.strip() or None
+    if "solana_wallet" in updates and updates["solana_wallet"]:
+        if len(updates["solana_wallet"]) > 255:
+            return None, "solana_wallet is too long"
+    return updates, None
+
+
+def _validate_password_change_payload(payload):
+    """Validate a password change without exposing the new password."""
+    if not isinstance(payload, dict):
+        return None, "Password data is required"
+    current = payload.get("current_password")
+    new_password = payload.get("new_password")
+    confirmation = payload.get("new_password_confirm")
+    if not all(
+        isinstance(value, str)
+        for value in (current, new_password, confirmation)
+    ):
+        return None, "Current and new passwords are required"
+    if len(new_password) < 8:
+        return None, "new_password must contain at least 8 characters"
+    if new_password != confirmation:
+        return None, "new password confirmation does not match"
+    return {
+        "current_password": current,
+        "new_password": new_password,
+    }, None
+
+
 def _generate_unique_hospital_id():
     """Generate an unused four-digit hospital ID."""
     for _ in range(100):
@@ -549,6 +619,17 @@ def _hospital_from_session():
     if hospital is None:
         session.pop("hospital_id", None)
     return hospital
+
+
+def _donor_from_session():
+    """Return the donor associated with the current login session."""
+    donor_id = _parse_id(session.get("donor_id"))
+    if donor_id is None:
+        return None
+    donor = User.query.filter_by(id=donor_id, role="donor").first()
+    if donor is None:
+        session.pop("donor_id", None)
+    return donor
 
 
 def _validate_patient_payload(payload):
@@ -881,6 +962,29 @@ def _user_data(user):
     }
 
 
+def _donor_profile_view(donor):
+    """Build the donor-safe profile context for dashboard templates."""
+    return {
+        "name": donor.name,
+        "login_id": donor.donor_login_id,
+        "status": DONOR_ACTIVE if donor.is_active else DONOR_CANCELLED,
+        "blood_group": donor.blood_group,
+        "organ": donor.organ or "",
+        "contact": donor.contact or "",
+        "location": donor.location or "",
+        "medical_history": donor.medical_history or "",
+        "sugar_level": donor.sugar_level or "",
+        "blood_pressure": donor.blood_pressure or "",
+        "weight": donor.weight or "",
+        "height": donor.height or "",
+        "additional_health_details": (
+            donor.additional_health_details or ""
+        ),
+        "solana_wallet": donor.solana_wallet or "",
+        "health_certificate_path": donor.health_certificate_path,
+    }
+
+
 def _hospital_data(hospital):
     """Convert a SQLAlchemy hospital model to matching data."""
     return {
@@ -1039,6 +1143,38 @@ def _ensure_hospital_profile_schema():
         raise
 
 
+def _ensure_donor_profile_schema():
+    """Add clinical profile columns to older SQLite user tables."""
+    if db.engine.dialect.name != "sqlite":
+        return
+    existing_columns = {
+        row[1]
+        for row in db.session.execute(
+            text("PRAGMA table_info(users)")
+        ).all()
+    }
+    additions = {
+        "sugar_level": "VARCHAR(50)",
+        "blood_pressure": "VARCHAR(50)",
+        "weight": "VARCHAR(50)",
+        "height": "VARCHAR(50)",
+        "additional_health_details": "TEXT",
+    }
+    try:
+        for column, column_type in additions.items():
+            if column not in existing_columns:
+                db.session.execute(
+                    text(
+                        f'ALTER TABLE users ADD COLUMN "{column}" '
+                        f"{column_type}"
+                    )
+                )
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        raise
+
+
 def create_app(test_config=None):
     """Create and configure the SQLite-backed Flask application."""
     app = Flask(__name__)
@@ -1081,6 +1217,7 @@ def create_app(test_config=None):
     with app.app_context():
         db.create_all()
         _ensure_hospital_profile_schema()
+        _ensure_donor_profile_schema()
 
     @app.get("/")
     def index():
@@ -1535,11 +1672,8 @@ def create_app(test_config=None):
 
     @app.get("/donors/dashboard")
     def donor_dashboard():
-        donor_id = _parse_id(session.get("donor_id"))
-        if donor_id is None:
-            return redirect(url_for("donor_login"))
-        donor = db.session.get(User, donor_id)
-        if donor is None or donor.role != "donor":
+        donor = _donor_from_session()
+        if donor is None:
             session.clear()
             return redirect(url_for("donor_login"))
         matches = DonationMatching.query.filter_by(
@@ -1557,16 +1691,211 @@ def create_app(test_config=None):
         ]
         return render_template(
             "donor_dashboard.html",
-            donor={
-                "name": donor.name,
-                "login_id": donor.donor_login_id,
-                "status": DONOR_ACTIVE
-                if donor.is_active
-                else DONOR_CANCELLED,
-                "organ": donor.organ or "",
-                "blood_group": donor.blood_group,
-            },
+            donor=_donor_profile_view(donor),
             matches=match_views,
+            wallet_connected=request.args.get("wallet_connected") == "1",
+            wallet_error=request.args.get("wallet_error", ""),
+            password_changed=request.args.get("password_changed") == "1",
+            password_error=request.args.get("password_error", ""),
+        )
+
+    @app.get("/donors/profile")
+    def donor_profile():
+        donor = _donor_from_session()
+        if donor is None:
+            return redirect(url_for("donor_login"))
+        return render_template(
+            "donor_profile.html",
+            donor=_donor_profile_view(donor),
+            blood_groups=sorted(ALLOWED_BLOOD_GROUPS),
+            profile_updated=request.args.get("profile_updated") == "1",
+            profile_error=request.args.get("profile_error", ""),
+            password_changed=request.args.get("password_changed") == "1",
+            password_error=request.args.get("password_error", ""),
+        )
+
+    @app.post("/donors/profile", endpoint="donor_profile_update")
+    @app.post("/api/donors/profile")
+    def update_donor_profile():
+        wants_json = request.is_json or request.path.startswith("/api/")
+        donor = _donor_from_session()
+        if donor is None:
+            return jsonify(error="Donor login required"), 401
+
+        def profile_error(message, status_code):
+            if wants_json:
+                return jsonify(error=message), status_code
+            return redirect(
+                url_for(
+                    "donor_profile",
+                    profile_error=message,
+                )
+            )
+
+        payload = request.form.to_dict()
+        if not payload and request.is_json:
+            payload = request.get_json(silent=True) or {}
+        profile_data, validation_error = _validate_donor_profile_payload(
+            payload
+        )
+        if validation_error:
+            return profile_error(validation_error, 400)
+
+        new_certificate_path = None
+        certificate = request.files.get("health_certificate")
+        if certificate and certificate.filename:
+            try:
+                new_certificate_path = _upload_health_certificate(
+                    certificate,
+                    app.config,
+                )
+            except CertificateUploadError as error:
+                return profile_error(str(error), 400)
+            except StorageConfigurationError:
+                return profile_error(
+                    "Document storage unavailable",
+                    503,
+                )
+            except StorageUploadError:
+                return profile_error("Document upload failed", 502)
+
+        if not profile_data and not new_certificate_path:
+            return profile_error(
+                "At least one profile detail is required",
+                400,
+            )
+        old_certificate_path = donor.health_certificate_path
+        for field, value in profile_data.items():
+            setattr(donor, field, value)
+        if new_certificate_path:
+            donor.health_certificate_path = new_certificate_path
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            _delete_health_certificate(
+                new_certificate_path,
+                app.config,
+                current_app.logger,
+            )
+            return profile_error(
+                "Donor profile could not be saved",
+                503,
+            )
+
+        if (
+            new_certificate_path
+            and old_certificate_path
+            and old_certificate_path != new_certificate_path
+        ):
+            _delete_health_certificate(
+                old_certificate_path,
+                app.config,
+                current_app.logger,
+            )
+        if wants_json:
+            return jsonify(
+                donor_id=donor.id,
+                message="Donor profile updated successfully",
+            )
+        return redirect(
+            url_for(
+                "donor_profile",
+                profile_updated="1",
+            )
+        )
+
+    @app.post("/donors/wallet", endpoint="donor_wallet_connection")
+    @app.post("/api/donors/wallet")
+    def connect_donor_wallet():
+        wants_json = request.is_json or request.path.startswith("/api/")
+        donor = _donor_from_session()
+        if donor is None:
+            return jsonify(error="Donor login required"), 401
+        payload = _request_payload()
+        wallet = payload.get("solana_wallet")
+        if not isinstance(wallet, str) or not wallet.strip():
+            message = "Solana wallet address is required"
+            if wants_json:
+                return jsonify(error=message), 400
+            return redirect(
+                url_for("donor_dashboard", wallet_error=message)
+            )
+        wallet = wallet.strip()
+        if len(wallet) > 255:
+            message = "Solana wallet address is too long"
+            if wants_json:
+                return jsonify(error=message), 400
+            return redirect(
+                url_for("donor_dashboard", wallet_error=message)
+            )
+        donor.solana_wallet = wallet
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            message = "Solana wallet could not be saved"
+            if wants_json:
+                return jsonify(error=message), 503
+            return redirect(
+                url_for("donor_dashboard", wallet_error=message)
+            )
+        if wants_json:
+            return jsonify(
+                donor_id=donor.id,
+                solana_wallet=donor.solana_wallet,
+                message="Solana wallet connected successfully",
+            )
+        return redirect(
+            url_for("donor_dashboard", wallet_connected="1")
+        )
+
+    @app.post("/donors/password", endpoint="donor_password_change")
+    @app.post("/api/donors/password")
+    def change_donor_password():
+        wants_json = request.is_json or request.path.startswith("/api/")
+        donor = _donor_from_session()
+        if donor is None:
+            return jsonify(error="Donor login required"), 401
+        password_data, validation_error = (
+            _validate_password_change_payload(_request_payload())
+        )
+        if validation_error:
+            if wants_json:
+                return jsonify(error=validation_error), 400
+            return redirect(
+                url_for(
+                    "donor_dashboard",
+                    password_error=validation_error,
+                )
+            )
+        if not donor.password_hash or not check_password_hash(
+            donor.password_hash,
+            password_data["current_password"],
+        ):
+            message = "Current password is incorrect"
+            if wants_json:
+                return jsonify(error=message), 401
+            return redirect(
+                url_for("donor_dashboard", password_error=message)
+            )
+        donor.password_hash = generate_password_hash(
+            password_data["new_password"]
+        )
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            message = "Password could not be changed"
+            if wants_json:
+                return jsonify(error=message), 503
+            return redirect(
+                url_for("donor_dashboard", password_error=message)
+            )
+        if wants_json:
+            return jsonify(message="Donor password changed successfully")
+        return redirect(
+            url_for("donor_dashboard", password_changed="1")
         )
 
     @app.post("/api/donors/cancel")
