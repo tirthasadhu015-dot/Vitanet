@@ -55,11 +55,65 @@ body {
 }
 
 .main-nav a,
+.nav-menu summary,
 .sidebar-nav a {
     color: var(--muted);
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
+}
+
+.nav-menu {
+    position: relative;
+}
+
+.nav-menu summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.nav-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-menu summary::after {
+    content: "v";
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.nav-menu[open] summary::after {
+    content: "^";
+}
+
+.nav-menu summary:hover,
+.nav-menu[open] summary {
+    color: var(--teal);
+}
+
+.nav-submenu {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+    min-width: 175px;
+    padding: 6px;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    z-index: 10;
+}
+
+.nav-submenu a {
+    display: block;
+    padding: 8px 10px;
+    white-space: nowrap;
+}
+
+.nav-submenu a:hover {
+    background: #f1f5f9;
+    border-radius: 5px;
+    color: var(--teal);
 }
 
 .main-nav a:hover,
@@ -822,6 +876,11 @@ tbody tr:nth-child(even) {
 
     .main-nav {
         flex-wrap: wrap;
+    }
+
+    .nav-submenu {
+        left: 0;
+        right: auto;
     }
 
     .hero-panel {

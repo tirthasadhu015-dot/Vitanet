@@ -14,11 +14,31 @@
                 <span class="tagline">Decentralized trust for life-saving donations</span>
             </div>
             <nav class="main-nav" aria-label="Primary navigation">
-                <a href="{{ url_for('donor_registration_form') }}">Donate</a>
-                <a href="{{ url_for('donor_login') }}">Donor login</a>
+                <a href="{{ url_for('index') }}">Home</a>
+                <details class="nav-menu">
+                    <summary>Donor</summary>
+                    <div class="nav-submenu">
+                        <a href="{{ url_for('donor_registration_form') }}">
+                            Register as donor
+                        </a>
+                        <a href="{{ url_for('donor_login') }}">
+                            Donor login
+                        </a>
+                    </div>
+                </details>
                 <a href="{{ url_for('find_organ') }}">Find an organ</a>
-                <a href="{{ url_for('hospital_registration_form') }}">Hospitals</a>
-                <a href="{{ url_for('hospital_login') }}">Hospital login</a>
+                <details class="nav-menu">
+                    <summary>Hospitals</summary>
+                    <div class="nav-submenu">
+                        <a href="{{ url_for('hospital_registration_form') }}">
+                            Register a hospital
+                        </a>
+                        <a href="{{ url_for('hospital_login') }}">
+                            Hospital login
+                        </a>
+                    </div>
+                </details>
+                <a href="{{ url_for('index') }}#about">About</a>
             </nav>
         </header>
 
