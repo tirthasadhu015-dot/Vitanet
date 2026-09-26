@@ -1,1 +1,70 @@
-Product Requirements Document (PRD)Project OverviewProject Name: vitanet (Organ Donation & Management Platform)Architecture: Full-stack Web Application (Frontend: HTML, CSS, JavaScript | Backend: Python Flask / Gunicorn)Database: DigitalOcean Managed MongoDBCloud & Storage: DigitalOcean App Platform (PaaS) & DigitalOcean Spaces (Object Storage for Documents)Web3 & Blockchain: Solana Blockchain integrated via a Dedicated Solana RPC Proxy Node (hosted on a DigitalOcean Droplet)AI Integration: Gemini API for automated hospital background checks and risk assessments1. Executive SummaryOrganise is a secure, transparent, and decentralized-hybrid platform designed to revolutionize the traditional organ donation and matching process. By combining traditional web tech with Solana blockchain escrow transactions, DigitalOcean cloud infrastructure, and Gemini AI verifications, the platform eliminates third-party interference, prevents corruption, streamlines hospital approvals, and ensures fast, trustworthy matches between donors and patients.2. Key Features & Functional Requirements2.1 Hospital Registration & AI Background CheckFeature: Hospitals can register on the platform by submitting details such as name, license number, email, and location.AI Verification: Upon submission, the system triggers the Gemini API to run a preliminary risk assessment and background check simulation to validate the hospital's authenticity.Database Storage: Hospital profiles and AI-generated reports are stored in the MongoDB hospitals collection.2.2 Donor Registration & Health Certificate UploadFeature: Potential donors can register by providing personal info, blood group, organ type, and contact details.Document Handling: Donors must upload their medical/health certificates.Storage: Files are securely uploaded and stored via DigitalOcean Spaces Object Storage, with file URLs mapped in MongoDB.2.3 Patient Registration & Solana Escrow DepositFeature: Patients or their representatives can register their organ requirements, urgency levels (Emergency, High, Normal), and Solana wallet addresses.Crypto Escrow: Patients deposit Solana (SOL) coins into the platform's secure escrow pool prior to matching. The deposit status is tracked as Locked in Escrow in the database.2.4 Smart Organ Matching AlgorithmFeature: An automated matching service evaluates and pairs donors with patients.Matching Criteria: Blood group compatibility, required organ type, patient urgency level, and hospital proximity.2.5 Hospital Verification & Fund Release WorkflowFeature: Operations take place at a verified hospital. Once a donation and operation are successfully completed, the hospital reviews and verifies the case through their dashboard.Blockchain Payout: Upon hospital approval, the backend interacts with the Dedicated Solana RPC Proxy Node to automatically release and transfer the locked SOL funds from escrow to the donor's wallet address.2.6 Hospital Rating & Review SystemFeature: Post-service, patients and donors can rate and review hospitals (1 to 5 stars). Ratings are aggregated and displayed on hospital profiles.3. Technical Architecture & Infrastructure StackComponentTechnology / ServiceDescriptionFrontendHTML5, CSS3, JavaScriptResponsive user interfaces, forms, and interactive dashboards.BackendPython (Flask), GunicornRESTful routing, request handling, business logic, and server management.DatabaseDigitalOcean Managed MongoDBFlexible NoSQL schema storage for users, hospitals, matches, and transactions.Object StorageDigitalOcean SpacesSecure S3-compatible cloud storage for donor health certificates and documents.App HostingDigitalOcean App PlatformFully managed PaaS for automated deployments directly from GitHub.Blockchain NodeDigitalOcean DropletDedicated Solana RPC Proxy Node ensuring high-speed, reliable transaction execution.AI EngineGemini API (gemini-1.5-flash)Automated background checks and risk analysis for hospital vetting.4. Database Schema Design (MongoDB Collections)hospitals Collection:_id (ObjectId)name (String)license_no (String)email (String)location (String)is_verified (Boolean)ai_background_report (String)created_at (Timestamp)users Collection (Donors & Patients):_id (ObjectId)name (String)role (String: "donor" or "patient")blood_group (String)organ / required_organ (String)contact (String)health_certificate_path (String - For Donors)urgency (String - For Patients)solana_wallet (String - For Patients)deposit_amount (Number - For Patients)deposit_status (String: "Locked in Escrow" / "Released to Donor")donations_matching Collection:_id (ObjectId)donor_id (ObjectId reference)patient_id (ObjectId reference)hospital_id (ObjectId reference)status (String: "Pending", "Hospital_Verified", "Completed")solana_tx_hash (String)reviews Collection:_id (ObjectId)hospital_id (ObjectId reference)user_id (ObjectId reference)rating (Number: 1-5)review_text (String)5. Security & Non-Functional RequirementsData Privacy: Secure handling of sensitive medical documents via signed URLs on DigitalOcean Spaces.Authentication: Password hashing and role-based access control (RBAC) for Patients, Donors, Hospitals, and Admins.Scalability: Horizontal scaling capabilities utilizing DigitalOcean's App Platform and Managed Database clusters.Reliability: Dedicated Solana RPC proxy node ensures fault tolerance and bypasses public rate limits during high-demand network traffic.
+# Vitanet Product Requirements Document
+
+## 1. Project overview
+
+Vitanet is a Flask organ donation and management platform. It combines a
+responsive HTML/CSS frontend, a SQLite database accessed through
+Flask-SQLAlchemy, DigitalOcean hosting and Spaces storage, Gemini hospital
+vetting, and Solana escrow settlement through a dedicated RPC proxy.
+
+## 2. Functional requirements
+
+### 2.1 Hospital registration and AI vetting
+
+Hospitals submit a name, license number, email, location, and optional
+credentials. The backend calls Gemini through `google-genai` for a lightweight
+Google Maps link check, generates a unique four-digit hospital ID, and stores the
+profile, assessment report, and verification state in the SQLite `hospitals`
+table.
+
+### 2.2 Donor registration and authentication
+
+Donors submit their name, blood group, organ type, contact details, medical
+history, payout wallet, and a password. Passwords are hashed, a unique donor
+login ID is generated, and the donor can review status or cancel an active
+registration from the donor dashboard. An optional health certificate can be
+stored in DigitalOcean Spaces or the local upload fallback.
+
+### 2.3 Patient registration and escrow state
+
+Patients submit their required organ, blood group, urgency (`Emergency`,
+`High`, or `Normal`), wallet, and deposit amount. The application records the
+deposit as `Locked in Escrow` until a successful hospital verification and
+Solana payout.
+
+### 2.4 Smart organ matching
+
+The backend matches active donors and patients using organ compatibility,
+blood-group compatibility, patient urgency, wallet availability, and location
+scoring. Matches are stored in the `donations_matching` SQLite table with
+`Pending` status.
+
+### 2.5 Hospital verification and payout
+
+Verified hospitals see their pending match queue in the dashboard. After an
+operation is confirmed, the dashboard action calls the Solana RPC payout
+adapter. A successful transaction records the signature, marks the match
+`Completed`, and releases the patient escrow state to the donor.
+
+### 2.6 Reviews
+
+A donor or patient may submit one 1-to-5-star review after a completed match.
+The hospital dashboard and review page display the aggregated rating.
+
+## 3. Technical requirements
+
+- Backend: Python, Flask, Flask-SQLAlchemy, and Gunicorn.
+- Database: SQLite at `instance/vitanet.db` by default.
+- Object storage: DigitalOcean Spaces through `boto3`, with a local fallback.
+- AI: Gemini API through `google-genai`, using the configured model and
+  defaulting to `gemini-2.5-flash` for Google Maps link verification.
+- Blockchain: Solana SDK and a configured RPC endpoint.
+- Deployment: DigitalOcean App Platform using the root `Procfile`.
+
+## 4. Security and privacy
+
+Credentials and private keys are loaded from `.env` or deployment environment
+variables and are never hardcoded. Passwords are stored as hashes. Medical
+uploads use validated filenames and extension checks, and local uploads remain
+ignored by version control. Sensitive responses use security headers and
+database errors do not expose credentials or connection details.

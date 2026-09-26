@@ -11,11 +11,15 @@
         <p class="sidebar-muted">Hospital ID: {{ hospital.registration_id }}</p>
         <nav class="sidebar-nav">
             <a class="active" href="#matches">Match queue</a>
+            <a href="#profile">Hospital profile</a>
             <a href="{{ url_for('find_organ') }}">Find an organ</a>
             <a href="{{ url_for('hospital_reviews', hospital_id=hospital.id) }}">
                 Reviews
             </a>
         </nav>
+        <form method="post" action="{{ url_for('hospital_logout') }}">
+            <button class="button button-small" type="submit">Log out</button>
+        </form>
     </aside>
 
     <main class="dashboard-content">
@@ -30,6 +34,29 @@
             </span>
         </div>
 
+        {% if profile_updated %}
+        <div class="toast toast-success" role="status">
+            Hospital profile updated successfully.
+        </div>
+        {% elif profile_error %}
+        <div class="toast toast-error" role="alert">
+            {{ profile_error }}
+        </div>
+        {% endif %}
+        {% if verification_error %}
+        <div class="toast toast-error" role="alert">
+            {{ verification_error }}
+        </div>
+        {% elif verification == "success" %}
+        <div class="toast toast-success" role="status">
+            Hospital verified successfully. Find an organ is now available.
+        </div>
+        {% elif verification == "pending" %}
+        <div class="toast toast-error" role="alert">
+            AI review completed. Additional manual review is required.
+        </div>
+        {% endif %}
+
         <div class="stat-grid">
             <article class="stat-card">
                 <span class="stat-label">Active matches</span>
@@ -37,7 +64,7 @@
             </article>
             <article class="stat-card">
                 <span class="stat-label">Hospital rating</span>
-                <strong>{{ hospital.rating_average }} <span class="star">★</span></strong>
+                <strong>{{ hospital.rating_average }} <span class="star">&#9733;</span></strong>
                 <small>{{ hospital.rating_count }} reviews</small>
             </article>
             <article class="stat-card stat-card-accent">
@@ -46,6 +73,87 @@
                 <small>Escrow release via RPC proxy</small>
             </article>
         </div>
+
+        <section class="form-card" id="profile" aria-labelledby="profile-heading">
+            <div class="section-heading">
+                <div>
+                    <h2 id="profile-heading">Hospital profile</h2>
+                    <p>Add the details required for AI verification.</p>
+                </div>
+            </div>
+            <form action="{{ url_for('hospital_profile_update') }}"
+                  method="post" enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="name">Hospital name</label>
+                        <input id="name" name="name" type="text"
+                               value="{{ hospital.name }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="license_no">License number</label>
+                        <input id="license_no" name="license_no" type="text"
+                               value="{{ hospital.license_no }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="email">Registration email</label>
+                        <input id="email" name="email" type="email"
+                               value="{{ hospital.email }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="location">Location</label>
+                        <input id="location" name="location" type="text"
+                               value="{{ hospital.location }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="bed_capacity">Bed capacity</label>
+                        <input id="bed_capacity" name="bed_capacity"
+                               type="number" min="1"
+                               value="{{ hospital.bed_capacity or '' }}"
+                               required>
+                    </div>
+                    <div class="field">
+                        <label for="establishment_year">
+                            Establishment year
+                        </label>
+                        <input id="establishment_year"
+                               name="establishment_year" type="number"
+                               min="1800" max="{{ current_year }}"
+                               value="{{ hospital.establishment_year or '' }}"
+                               required>
+                    </div>
+                    <div class="field field-full">
+                        <label for="google_map_link">Google Maps link</label>
+                        <input id="google_map_link" name="google_map_link"
+                               type="url"
+                               value="{{ hospital.google_map_link or '' }}"
+                               placeholder="https://maps.google.com/..."
+                               required>
+                    </div>
+                    <div class="field field-full">
+                        <label for="license_certificate">
+                            Hospital license certificate
+                        </label>
+                        <input id="license_certificate"
+                               name="license_certificate" type="file"
+                               accept=".pdf,.png,.jpg,.jpeg">
+                        {% if hospital.license_certificate_path %}
+                        <small>License certificate uploaded.</small>
+                        {% else %}
+                        <small>Upload a PDF, PNG, or JPG certificate.</small>
+                        {% endif %}
+                    </div>
+                </div>
+                <button class="button" type="submit">
+                    Save hospital profile
+                </button>
+            </form>
+            <form action="{{ url_for('hospital_verification') }}"
+                  method="post">
+                <button class="button" type="submit">
+                    Run AI verification
+                </button>
+            </form>
+        </section>
 
         <section class="table-card" aria-labelledby="queue-heading">
             <div class="section-heading">

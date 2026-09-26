@@ -1,12 +1,13 @@
 # Local environment and deployment secrets
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.p12
 *.secret
 secrets/
+instance/
+static/uploads/
 
 # Python and local tooling artifacts
 __pycache__/

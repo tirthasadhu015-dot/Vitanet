@@ -1,1 +1,41 @@
-Vitanet - Project Memory & Context (memory.md)1. Project Identity & EvolutionOriginal Project: Organise (Organ Donation Blockchain built at Solana HackDay Delhi, Nov 2022 by team "Byte Me").Remake Project Name: VitanetCore Transition: Evolved from a pure client-side Web3 prototype into a production-grade, secure, decentralized-hybrid web application combining traditional full-stack tech with blockchain escrow and cloud infrastructure.2. Tech Stack & Infrastructure DecisionsFrontend: HTML5, CSS3, JavaScript (Responsive dashboards, clean clinical design system).Backend: Python (Flask, Gunicorn) for RESTful routing and business logic.Database: DigitalOcean Managed MongoDB (Flexible NoSQL schema for users, hospitals, matches, and transactions).Cloud Storage: DigitalOcean Spaces (S3-compatible object storage for secure handling of donor health certificates and hospital verification documents).Hosting Platform: DigitalOcean App Platform (PaaS) for automated GitHub-linked deployments.Blockchain Infrastructure: Dedicated Solana RPC Proxy Node hosted on a DigitalOcean Droplet to bypass public rate limits and handle secure escrow lock/release workflows.Artificial Intelligence: Gemini API (gemini-1.5-flash) for automated hospital background checks and risk assessment simulation.3. Core Architectural WorkflowsHospital Vetting: Hospitals register with credentials $\rightarrow$ Gemini API runs an automated background check $\rightarrow$ Stored in MongoDB hospitals collection.Donor Onboarding: Donors register with medical details $\rightarrow$ Health certificates uploaded and secured via DigitalOcean Spaces.Patient Escrow: Patients register organ requirements and deposit Solana (SOL) $\rightarrow$ Funds marked as Locked in Escrow.Smart Matching & Verification: Automated algorithm pairs donors and patients $\rightarrow$ Operation takes place at a verified hospital $\rightarrow$ Hospital admin verifies success.Blockchain Settlement: Hospital sign-off triggers the backend via the dedicated DO Solana RPC node to release escrow funds to the donor's wallet.Post-Service Review: Patients/donors rate hospitals (1–5 stars) to maintain quality and transparency.4. Documentation IndexPRD.md: Comprehensive product requirements, feature specifications, and system scope.architecture.md: High-level system diagram, component breakdown, and data flow pathways.rules.md: Coding standards (PEP 8), security protocols, environment variable handling, and medical data privacy rules.design.md: Brand identity, color palette, typography, layout guidelines, and accessibility standards.tasks.md: Step-by-step development roadmap divided across 7 chronological phases.memory.md: Central repository context, evolution history, and technical architecture decisions.
+# Vitanet Project Memory
+
+## 1. Project identity
+
+Vitanet is a secure organ donation platform evolved from the Organise
+prototype. The current implementation uses Flask, Jinja templates,
+Flask-SQLAlchemy with SQLite, DigitalOcean infrastructure, Gemini AI, and
+Solana escrow settlement.
+
+## 2. Current technology decisions
+
+- Frontend: HTML5, CSS3, Jinja templates, and responsive custom CSS.
+- Backend: Python Flask served locally or by Gunicorn.
+- Database: SQLite through Flask-SQLAlchemy; default path
+  `instance/vitanet.db`.
+- Object storage: DigitalOcean Spaces through `boto3`, with a local fallback
+  for development.
+- Hosting: DigitalOcean App Platform.
+- Blockchain: Solana through the configured RPC proxy endpoint.
+- AI: Gemini API through `google-genai`, default model `gemini-2.5-flash`,
+  focused on Google Maps link verification.
+
+## 3. Core workflows
+
+1. Hospitals register and receive a unique four-digit ID after the Gemini
+   preliminary assessment is saved.
+2. Donors register with hashed credentials and may log in, view status, or
+   cancel their active registration.
+3. Patients register an organ requirement and escrow deposit state.
+4. The matching algorithm pairs active donors and patients using blood group,
+   organ type, urgency, wallet availability, and location scoring.
+5. A verified hospital reviews a pending match and triggers the Solana payout.
+6. Successful matches become completed and eligible donors or patients can
+   review the hospital.
+
+## 4. Repository guidance
+
+`docs/prd.md` contains product requirements, `docs/architecture.md` explains
+the system design, `docs/rules.md` contains coding and security standards,
+`docs/design.md` contains the visual system, and `docs/tasks.md` contains the
+implementation roadmap.

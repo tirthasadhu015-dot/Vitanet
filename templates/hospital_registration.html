@@ -7,8 +7,8 @@
     <p class="eyebrow">Hospital portal</p>
     <h1 id="hospital-heading">Register your hospital</h1>
     <p class="intro">
-        Submit your credentials for a preliminary AI-assisted background
-        assessment before joining the Vitanet network.
+        Create your hospital account first. Complete the profile and run the
+        AI-assisted verification from your secure dashboard.
     </p>
 
     <form action="{{ url_for('register_hospital') }}" method="post">
@@ -32,9 +32,22 @@
                 <label for="location">Location</label>
                 <input id="location" name="location" type="text" required>
             </div>
+
+            <div class="field">
+                <label for="password">Create password</label>
+                <input id="password" name="password" type="password"
+                       minlength="8" autocomplete="new-password" required>
+            </div>
+
+            <div class="field">
+                <label for="password_confirm">Confirm password</label>
+                <input id="password_confirm" name="password_confirm"
+                       type="password" minlength="8"
+                       autocomplete="new-password" required>
+            </div>
         </div>
 
-        <button class="button" type="submit">Submit for assessment</button>
+        <button class="button" type="submit">Create hospital account</button>
     </form>
 </section>
 {% endblock %}

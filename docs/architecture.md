@@ -1,81 +1,74 @@
 Vitanet - System Architecture
-1. High-Level Architecture Diagram
-Plaintext
-                                [ Users / Hospitals ] (Browser / Client)
-                                            │
-                                 (HTTPS / Custom Domain)
-                                            ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     DigitalOcean App Platform (PaaS)                        │
-│                 (Python Flask Backend + HTML/CSS/JS Frontend)               │
-└───────┬───────────────────────┬─────────────────────────┬───────────────────┘
-        │                       │                         │
-        ▼                       ▼                         ▼
-┌──────────────┐        ┌───────────────┐         ┌───────────────────────────┐
-│ DO Managed   │        │   DO Spaces   │         │ Dedicated Solana RPC      │
-│   MongoDB    │        │(Object Store) │         │ Proxy Node (DO Droplet)   │
-│ (Database)   │        │ (Cert / Docs) │         │   (Solana Web3 Engine)    │
-└──────────────┘        └───────────────┘         └─────────────┬─────────────┘
-                                                                │
-                                                                ▼
-                                                [ Solana Mainnet / Devnet ]
-2. Component Breakdown
-2.1 Frontend Tier (Client Side)
-Technologies: HTML5, CSS3, JavaScript
 
-Responsibility: Renders responsive user interfaces, forms (Donor, Patient, and Hospital registration), dynamic dashboards, and status trackers. Communicates asynchronously with the backend via RESTful APIs.
+## 1. High-Level Architecture
 
-2.2 Application Tier (Backend & Business Logic)
-Technologies: Python, Flask, Gunicorn
+Users and hospitals access the Flask application through a browser over HTTPS.
+The application is deployed with Gunicorn on DigitalOcean App Platform and
+uses the following services:
 
-Responsibility:
+- SQLite, accessed through Flask-SQLAlchemy, for relational application data.
+- DigitalOcean Spaces for optional private medical document storage.
+- Gemini API through `google-genai` for lightweight Google Maps verification.
+- A dedicated Solana RPC proxy node for escrow payout transactions.
 
-Manages routing, user authentication, and session handling.
+## 2. Component Breakdown
 
-Implements the Smart Organ Matching Algorithm based on blood type compatibility, organ category, urgency levels, and location.
+### 2.1 Frontend tier
 
-Coordinates API communications with the Gemini AI engine for hospital background vetting.
+HTML5, CSS3, and Jinja templates render responsive donor, patient, and
+hospital portals, dashboards, forms, and status trackers.
 
-Manages escrow state transitions and triggers blockchain payout actions.
+### 2.2 Application tier
 
-2.3 Data Storage & Database Tier
-Technologies: DigitalOcean Managed MongoDB
+Python, Flask, and Gunicorn provide routing, sessions, validation, password
+hashing, matching, escrow state transitions, reviews, and service adapters.
 
-Responsibility: Stores flexible NoSQL documents for users (donors and patients), hospital profiles, matching records, audit logs, and review ratings without rigid schema bottlenecks.
+### 2.3 Database tier
 
-2.4 Cloud Object Storage Tier
-Technologies: DigitalOcean Spaces (S3-Compatible Object Storage)
+Flask-SQLAlchemy maps the relational models to SQLite. The database contains
+hospital, user, donation matching, review, and restricted-search audit data.
+Foreign keys and transactions keep match and payout state changes consistent.
+The default local database path is `instance/vitanet.db`.
 
-Responsibility: Secures and stores sensitive medical documents, such as donor health certificates and hospital verification licenses, providing secure download and retrieval URLs.
+### 2.4 Object storage tier
 
-2.5 Blockchain & RPC Infrastructure Tier
-Technologies: DigitalOcean Droplet (Ubuntu), Solana Web3 SDK
+DigitalOcean Spaces is an S3-compatible store for optional donor health
+certificates. If Spaces is not configured, the application falls back to the
+ignored local `static/uploads/` directory.
 
-Responsibility: Hosts a Dedicated Solana RPC Proxy Node to eliminate public rate limits, ensure low-latency transactions, and execute secure smart escrow lock and release workflows upon hospital confirmation.
+### 2.5 Blockchain and RPC tier
 
-2.6 Artificial Intelligence Tier
-Technologies: Gemini API (gemini-1.5-flash)
+The Solana SDK sends payout transactions through the configured RPC endpoint.
+Hospital verification changes a pending match to verified, invokes the payout
+adapter, and marks the match and patient escrow as completed only after a
+successful transaction response.
 
-Responsibility: Automatically parses incoming hospital registration inputs to run preliminary background checks, risk assessments, and legitimacy evaluations.
+### 2.6 Artificial intelligence tier
 
-3. Core Data Flow Workflows
-Workflow A: Hospital Registration & AI Vetting
-Input: Hospital submits credentials (Name, License Number, Location, Email) via the frontend portal.
+The Gemini API receives hospital registration details as untrusted data and
+returns a preliminary risk report and verification flag. The report is stored
+with the hospital record for later review.
 
-AI Analysis: Flask backend forwards the credentials to the Gemini API for automated background simulation.
+## 3. Core Data Flows
 
-Persistence: The structured profile and generated AI risk report are saved into the DigitalOcean Managed MongoDB hospitals collection.
+### Workflow A: Hospital registration and AI vetting
 
-Workflow B: Patient Deposit & Solana Escrow
-Input: Patient registers and connects their Solana wallet.
+1. A hospital submits its name, license, email, and location.
+2. Flask validates the request and calls Gemini.
+3. SQLAlchemy stores the hospital, generated four-digit ID, AI report, and
+   verification state in SQLite.
 
-Escrow Lock: Patient deposits Solana (SOL) coins into the platform pool.
+### Workflow B: Patient deposit and matching
 
-State Update: Database updates the patient record with deposit_status: "Locked in Escrow".
+1. A patient submits an organ requirement, urgency, wallet, and deposit.
+2. The patient deposit is recorded as `Locked in Escrow`.
+3. The matching algorithm checks organ type, blood compatibility, urgency,
+   active donor status, wallet availability, and proximity scoring.
+4. A compatible pair is stored in `donations_matching` with `Pending` status.
 
-Workflow C: Verification & Payout Execution
-Operation & Review: The transplant operation takes place at the designated verified hospital.
+### Workflow C: Verification and payout
 
-Hospital Sign-off: Hospital admins approve and verify the successful donation through their secure dashboard.
-
-Blockchain Settlement: The backend routes the transaction instruction through the Dedicated Solana RPC Proxy Node to transfer locked SOL funds directly from escrow to the donor's verified wallet address.
+1. A verified hospital reviews its pending queue.
+2. Hospital verification invokes the configured Solana RPC payout adapter.
+3. On success, the match becomes `Completed`, the transaction hash is saved,
+   and the patient deposit becomes `Released to Donor`.

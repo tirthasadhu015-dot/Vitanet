@@ -2,16 +2,16 @@ Vitanet - Task Breakdown & Development Roadmap (tasks.md)
 Phase 1: Project Initialization & Infrastructure Setup
 [ ] Initialize GitHub repository and set up folder structure (app.py, static/, templates/, requirements.txt).
 
-[ ] Configure Python virtual environment and install core packages (Flask, pymongo, google-generativeai, boto3, gunicorn).
+[ ] Configure Python virtual environment and install core packages (Flask, Flask-SQLAlchemy, google-genai, boto3, gunicorn).
 
-[ ] Set up DigitalOcean Managed MongoDB cluster and configure connection URI in environment variables (.env).
+[ ] Configure the SQLite database through Flask-SQLAlchemy; keep external service credentials in .env.
 
 [ ] Configure DigitalOcean Spaces object storage and write the boto3 utility script for file uploads.
 
 [ ] Provision and configure a DigitalOcean Droplet as a dedicated Solana RPC proxy node.
 
 Phase 2: Database Schema & Backend Core Setup
-[ ] Establish MongoDB collections and indexes for hospitals, users (donors/patients), donations_matching, and reviews.
+[ ] Establish SQLAlchemy models and indexes for hospitals, users (donors/patients), donations_matching, and reviews.
 
 [ ] Implement Flask application factory and base error-handling routes in app.py.
 
@@ -20,9 +20,9 @@ Phase 2: Database Schema & Backend Core Setup
 Phase 3: AI Integration & Hospital Vetting Module
 [ ] Build the Hospital Registration Form (HTML/CSS) capturing name, license number, email, and location.
 
-[ ] Integrate Gemini API (gemini-1.5-flash) inside the Flask backend for automated background verification and risk analysis.
+[ ] Integrate Gemini API through google-genai for lightweight Google Maps link verification.
 
-[ ] Store generated AI reports alongside hospital profiles in MongoDB with an is_verified status flag.
+[ ] Store generated AI reports alongside hospital profiles in SQLite with an is_verified status flag.
 
 Phase 4: Donor & Patient Portals (With File Upload & Escrow)
 [ ] Create the Donor Registration Portal with form fields for blood group, organ type, contact info, and medical history.

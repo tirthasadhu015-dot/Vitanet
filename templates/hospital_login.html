@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Hospital Login | Vitanet{% endblock %}
+
+{% block content %}
+<section class="form-card" aria-labelledby="hospital-login-heading">
+    <p class="eyebrow">Hospital portal</p>
+    <h1 id="hospital-login-heading">Hospital admin login</h1>
+    {% if registered %}
+    <p class="intro">
+        Registration complete. Use your email or four-digit hospital ID to
+        access your dashboard.
+    </p>
+    {% else %}
+    <p class="intro">
+        Sign in to update your profile, run AI verification, and manage
+        hospital operations.
+    </p>
+    {% endif %}
+
+    <form action="{{ url_for('hospital_login') }}" method="post">
+        <div class="form-grid">
+            <div class="field field-full">
+                <label for="identifier">Email or hospital ID</label>
+                <input id="identifier" name="identifier" type="text"
+                       value="{{ hospital_id }}" autocomplete="username"
+                       required>
+            </div>
+
+            <div class="field field-full">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password"
+                       autocomplete="current-password" required>
+            </div>
+        </div>
+
+        <button class="button" type="submit">Log in to dashboard</button>
+    </form>
+</section>
+{% endblock %}

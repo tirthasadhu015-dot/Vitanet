@@ -606,6 +606,11 @@ small {
     margin-top: 24px;
 }
 
+.status-cancelled {
+    background: #e2e8f0;
+    color: #475569;
+}
+
 .table-card h2 {
     font-size: 24px;
     font-weight: 600;
@@ -678,6 +683,32 @@ tbody tr:nth-child(even) {
 .status-completed {
     background: #d1fae5;
     color: #047857;
+}
+
+.toast {
+    border: 1px solid transparent;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+    font-size: 14px;
+    font-weight: 700;
+    max-width: 420px;
+    padding: 14px 18px;
+    position: fixed;
+    right: 24px;
+    top: 24px;
+    z-index: 20;
+}
+
+.toast-success {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.toast-error {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
 }
 
 .action-cell {
@@ -823,6 +854,12 @@ tbody tr:nth-child(even) {
 
     .form-card {
         padding: 22px;
+    }
+
+    .toast {
+        left: 18px;
+        right: 18px;
+        top: 18px;
     }
 
     h1 {

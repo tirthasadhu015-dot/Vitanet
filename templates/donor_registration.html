@@ -7,15 +7,13 @@
     <p class="eyebrow">Donor portal</p>
     <h1 id="donor-heading">Register as an organ donor</h1>
     <p class="intro">
-        Share your health details and upload a current medical certificate for
-        secure review by the Vitanet team.
+        Share your health details for secure review by the Vitanet team.
     </p>
     <p class="intro">
         Already registered? <a class="tx-link" href="{{ url_for('donor_login') }}">Log in to your donor portal</a>.
     </p>
 
-    <form action="{{ url_for('register_donor') }}" method="post"
-          enctype="multipart/form-data">
+    <form action="{{ url_for('register_donor') }}" method="post">
         <div class="form-grid">
             <div class="field field-full">
                 <label for="name">Full name</label>
@@ -80,12 +78,6 @@
                           rows="5" required></textarea>
             </div>
 
-            <div class="field field-full">
-                <label for="health_certificate">Health certificate</label>
-                <input id="health_certificate" name="health_certificate"
-                       type="file" accept=".pdf,.png,.jpg,.jpeg" required>
-                <small>Accepted formats: PDF, PNG, JPG, or JPEG. Maximum 10 MB.</small>
-            </div>
         </div>
 
         <button class="button" type="submit">Submit donor registration</button>
