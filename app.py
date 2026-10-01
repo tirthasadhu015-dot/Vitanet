@@ -11,7 +11,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
-import boto3
+try:
+    import boto3
+except ImportError:  # Optional when document storage falls back to disk.
+    boto3 = None
 from dotenv import load_dotenv
 from flask import (
     Flask,
@@ -681,6 +684,10 @@ def _spaces_client(config):
         raise StorageConfigurationError(
             "DigitalOcean Spaces configuration is incomplete"
         )
+    if boto3 is None:
+        raise StorageConfigurationError(
+            "boto3 is required when DigitalOcean Spaces is configured"
+        )
     return boto3.client(
         "s3",
         endpoint_url=config["DO_SPACES_ENDPOINT_URL"],
@@ -1179,7 +1186,9 @@ def create_app(test_config=None):
     """Create and configure the SQLite-backed Flask application."""
     app = Flask(__name__)
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SECRET_KEY"),
+        # Keep local development usable when no .env file has been created.
+        # Deployments should still set SECRET_KEY so sessions survive restarts.
+        SECRET_KEY=os.environ.get("SECRET_KEY") or secrets.token_urlsafe(32),
         SQLALCHEMY_DATABASE_URI="sqlite:///vitanet.db",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY"),
